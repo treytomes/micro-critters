@@ -1,0 +1,5 @@
+{
+	"still": "animations/personStill.json",
+	"bored": "animations/personBored.json",
+	"moving": "animations/personMoving.json"
+}
