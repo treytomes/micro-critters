@@ -11,6 +11,11 @@ CONSTITUTION_ENERGY_FACTOR = 50
 ENTITY_BORED_TIME = 3
 
 
+// Assets will be loaded from this path.
+//
+ASSET_ROOT = "/usr/assets/"
+
+
 // Pulled from /sys/lib/tc; move all these constants into globals.
 for kv in locals
 	if kv.key[0] != "_" then globals[kv.key] = @kv.value		

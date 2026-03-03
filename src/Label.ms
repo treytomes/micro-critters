@@ -1,4 +1,6 @@
-make = function(text, row, column, width)
+Label = {}
+
+Label.make = function(text, row, column, width)
 	self = new Label
 	self.text = text
 	self.row = row
@@ -7,8 +9,10 @@ make = function(text, row, column, width)
 	return self
 end function
 
-draw = function(fillObj)
+Label.draw = function(fillObj)
 	text.row = self.row
 	text.column = self.column
 	print self.text.fill(fillObj).pad(self.width)
 end function
+
+return Label

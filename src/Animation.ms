@@ -1,4 +1,6 @@
-fromImage = function(image)
+Animation = {}
+
+Animation.fromImage = function(image)
 	self = new Animation()
 	self.frames = [image]
 	self.frameIndex = 0
@@ -7,7 +9,7 @@ fromImage = function(image)
 	return self
 end function
 
-fromImageSet = function(imageSet, updateSpeed)
+Animation.fromImageSet = function(imageSet, updateSpeed)
 	self = new Animation()
 	self.frames = imageSet
 	self.frameIndex = 0
@@ -16,7 +18,7 @@ fromImageSet = function(imageSet, updateSpeed)
 	return self
 end function
 
-fromJson = function(jsonPath)
+Animation.fromJson = function(jsonPath)
 	jsonText = file.open(jsonPath).read
 	result = json.parse(jsonText)
 
@@ -30,7 +32,7 @@ fromJson = function(jsonPath)
 	return self.fromImageSet(tiles, updateSpeed)
 end function
 
-update = function(deltaTime)
+Animation.update = function(deltaTime)
 	self.lastUpdateTime += deltaTime
 	if self.lastUpdateTime >= self.updateSpeed then
 		self.lastUpdateTime -= self.updateSpeed
@@ -41,6 +43,8 @@ update = function(deltaTime)
 	end if
 end function
 
-getImage = function
+Animation.getImage = function
 	return self.frames[self.frameIndex]
 end function
+
+return Animation

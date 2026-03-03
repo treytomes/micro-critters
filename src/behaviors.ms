@@ -1,4 +1,9 @@
 Behavior = {}
+
+Behavior.toSerializable = function
+	return {}
+end function
+
 Behavior.update = function(entity, deltaTime)
 	return null
 end function
@@ -9,6 +14,12 @@ PlayerInputBehavior.make = function
 	self = new PlayerInputBehavior
 	self.boredTimer = Timer.make(ENTITY_BORED_TIME)
 	return self
+end function
+
+PlayerInputBehavior.toSerializable = function
+	result = {}
+	result.name = "PlayerInputBehavior"
+	return result
 end function
 
 PlayerInputBehavior.update = function(entity, deltaTime)
@@ -34,4 +45,11 @@ end function
 
 playerInput = function
 	return PlayerInputBehavior.make
+end function
+
+fromSerializable = function(data)
+	if data.name == "PlayerInputBehavior" then
+		return playerInput
+	end if
+	qa.assert false, "Unknown behavior name: " + data.name
 end function
