@@ -92,7 +92,22 @@ AssetFactory.loadTile = function(path)
 
 	result = json.parse(file.open(path).read)
 	tileSet = self.loadTileSet(result.tileSet)
-	imageTile = tileSet.getTile(result.tileIndex)
+
+	tileIndex = result.tileIndex
+	if tileIndex isa string then tileIndex = code(tileIndex)
+	imageTile = tileSet.getTile(tileIndex)
+
+	for y in range(imageTile.height - 1)
+		for x in range(imageTile.width - 1)
+			dst_c = imageTile.pixel(x, y)
+			if dst_c == null or dst_c == "#00000000" then
+				if result.hasIndex("backgroundColor") then imageTile.setPixel x, y, result.backgroundColor
+			else
+				if result.hasIndex("foregroundColor") then imageTile.setPixel x, y, result.foregroundColor
+			end if
+		end for
+	end for
+
 	self.assets[path] = imageTile
 	return imageTile
 end function

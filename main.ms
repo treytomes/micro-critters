@@ -43,8 +43,35 @@ applyClass = function(entity, classPath)
 end function
 
 initialize = function
+	display(5).mode = displayMode.tile
+	
+	// Build the world tile set.
+	tileImages = [
+		AssetFactory.loadTile("floor"),
+		AssetFactory.loadTile("wall")]
+	tileSet = TileSet.fromImages(tileImages)
+	display(5).tileSet = tileSet.image
+	display(5).tileSetTileSize = [tileSet.tileWidth, tileSet.tileHeight]  // size of each tile in the image
+	display(5).cellSize = display(5).tileSetTileSize
+
+	mapWidth = floor(gfx.width / tileSet.tileWidth)
+	mapHeight = floor(gfx.height / tileSet.tileHeight)
+	display(5).extent = [mapWidth, mapHeight]  // columns, rows on screen
+
+	// Build a simple map.
+	display(5).clear 0
+	for y in range(0, mapHeight - 1)
+		display(5).setCell 0, y, 1
+		display(5).setCell mapWidth - 1, y, 1
+	end for
+	for x in range(0, mapWidth - 1)
+		display(5).setCell x, 0, 1
+		display(5).setCell x, mapHeight - 1, 1
+	end for
+
 	text.clear
 	display(4).clear
+	
 	globals.entities = []
 	globals.worldActions = []
 

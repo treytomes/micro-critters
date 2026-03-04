@@ -79,8 +79,8 @@ Entity.addToDisplay = function(dsp)
 end function
 
 Entity.moveTo = function(tx, ty)
-	self.sprite.x = tx * self.sprite.image.width
-	self.sprite.y = ty * self.sprite.image.height
+	self.sprite.x = (tx - 0.5) * self.sprite.image.width
+	self.sprite.y = (ty + 0.5) * self.sprite.image.height
 end function
 
 Entity.moveBy = function(dtx, dty)
