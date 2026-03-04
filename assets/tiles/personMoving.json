@@ -1,4 +1,5 @@
 {
 	"tileSet": "fontTiles",
-	"tileIndex": 140
+	"tileIndex": 140,
+	"foregroundColor": "#FFFF00"
 }

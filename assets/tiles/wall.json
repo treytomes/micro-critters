@@ -2,5 +2,7 @@
 	"tileSet": "fontTiles",
 	"tileIndex": "#",
 	"foregroundColor": "#A0A0A0",
-	"backgroundColor": "#808080"
+	"backgroundColor": "#808080",
+	"blocksMovement": false,
+	"blocksVision": false
 }

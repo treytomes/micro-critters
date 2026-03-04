@@ -15,6 +15,13 @@ ENTITY_BORED_TIME = 3
 //
 ASSET_ROOT = "/usr/assets/"
 
+// The world is composed of a 3D cube of "chunks".
+
+// The width of a single chunk.
+//
+CHUNK_WIDTH = 64
+CHUNK_HEIGHT = 64
+
 
 // Pulled from /sys/lib/tc; move all these constants into globals.
 for kv in locals

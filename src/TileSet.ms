@@ -10,17 +10,18 @@ TileSet.make = function(image, tileWidth, tileHeight)
 	return self
 end function
 
-TileSet.fromImages = function(images)
-	self.tileWidth = images[0].width
-	self.tileHeight = images[0].height
+TileSet.fromTiles = function(tiles)
+	self.tileWidth = tiles[0].width
+	self.tileHeight = tiles[0].height
 	self.tiles = []
 	
 	self = new TileSet
-	self.image = Image.create(self.tileWidth * len(images), self.tileHeight, color.purple)
+	self.image = Image.create(self.tileWidth * len(tiles), self.tileHeight, color.purple)
 	
 	x = 0
-	for img in images
-		qa.assert img.width == self.tileWidth and img.height == self.tileHeight, "tile sizes must match"
+	for tile in tiles
+		img = tile.image
+		qa.assert img.width == self.tileWidth and img.height == self.tileHeight, "Tile sizes must match."
 
 		for dy in range(0, self.tileHeight - 1)
 			for dx in range(0, self.tileWidth - 1)

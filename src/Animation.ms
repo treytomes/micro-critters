@@ -26,7 +26,7 @@ Animation.fromJson = function(jsonPath)
 	tiles = []
 	for tilePath in result.frames
 		tile = AssetFactory.loadTile(tilePath)
-		tiles.push tile
+		tiles.push tile.image
 	end for
 
 	return self.fromImageSet(tiles, updateSpeed)

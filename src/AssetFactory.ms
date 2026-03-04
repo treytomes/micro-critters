@@ -90,26 +90,30 @@ AssetFactory.loadTile = function(path)
 		return self.assets[path]
 	end if
 
-	result = json.parse(file.open(path).read)
-	tileSet = self.loadTileSet(result.tileSet)
+	result = Tile.fromJson(path)
+	self.assets[path] = result
+	return result
 
-	tileIndex = result.tileIndex
-	if tileIndex isa string then tileIndex = code(tileIndex)
-	imageTile = tileSet.getTile(tileIndex)
+	// result = json.parse(file.open(path).read)
+	// tileSet = self.loadTileSet(result.tileSet)
 
-	for y in range(imageTile.height - 1)
-		for x in range(imageTile.width - 1)
-			dst_c = imageTile.pixel(x, y)
-			if dst_c == null or dst_c == "#00000000" then
-				if result.hasIndex("backgroundColor") then imageTile.setPixel x, y, result.backgroundColor
-			else
-				if result.hasIndex("foregroundColor") then imageTile.setPixel x, y, result.foregroundColor
-			end if
-		end for
-	end for
+	// tileIndex = result.tileIndex
+	// if tileIndex isa string then tileIndex = code(tileIndex)
+	// imageTile = tileSet.getTile(tileIndex)
 
-	self.assets[path] = imageTile
-	return imageTile
+	// for y in range(imageTile.height - 1)
+	// 	for x in range(imageTile.width - 1)
+	// 		dst_c = imageTile.pixel(x, y)
+	// 		if dst_c == null or dst_c == "#00000000" then
+	// 			if result.hasIndex("backgroundColor") then imageTile.setPixel x, y, result.backgroundColor
+	// 		else
+	// 			if result.hasIndex("foregroundColor") then imageTile.setPixel x, y, result.foregroundColor
+	// 		end if
+	// 	end for
+	// end for
+
+	// self.assets[path] = imageTile
+	// return imageTile
 end function
 
 AssetFactory.loadAnimation = function(path)
