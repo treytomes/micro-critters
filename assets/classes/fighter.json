@@ -1,0 +1,10 @@
+{
+	"name": "fighter",
+	"hp": "1d10",
+	"dexterity": "3d6",
+	"strength": "3d6",
+	"constitution": "3d6",
+	"intelligence": "3d6",
+	"charisma": "3d6",
+	"wisdom": "3d6"
+}

@@ -1,7 +1,7 @@
 {
 	"updateSpeed": 0.3,
 	"frames": [
-		"tiles/personBored0.json",
-		"tiles/personBored1.json"
+		"personBored0",
+		"personBored1"
 	]
 }

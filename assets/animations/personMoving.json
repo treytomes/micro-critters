@@ -1,6 +1,6 @@
 {
 	"updateSpeed": 0,
 	"frames": [
-		"tiles/personMoving.json"
+		"personMoving"
 	]
 }

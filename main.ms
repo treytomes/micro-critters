@@ -13,13 +13,15 @@ import "json"
 ensureImport "constants"
 
 ensureImport "actions"
+ensureImport "Animation"
 ensureImport "AnimationSet"
 ensureImport "AssetFactory"
 ensureImport "behaviors"
+ensureImport "Class"
 ensureImport "Dice"
 ensureImport "Entity"
 ensureImport "Label"
-ensureImport "Animation"
+ensureImport "Race"
 ensureImport "TileSet"
 ensureImport "Timer"
 ensureImport "WorldAction"
@@ -27,19 +29,18 @@ ensureImport "WorldAction"
 
 // You *could* think of race and class as external mutators.  If that helps.
 
-applyRace = function(entity)
-	// Human
-	entity.constitution += Dice.const(10).roll
+applyRace = function(entity, racePath)
+	race = AssetFactory.loadRace(racePath)
+	race.apply entity
 	return entity
 end function
 
 
-applyClass = function(entity)
-	// Fighter
-	entity.constitution += Dice.make(3, 6).roll
+applyClass = function(entity, classPath)
+	class = AssetFactory.loadClass(classPath)
+	class.apply entity
 	return entity
 end function
-
 
 initialize = function
 	text.clear
@@ -58,15 +59,15 @@ end function
 
 newGame = function
 	// The set of animations that makes a "person".
-	person = AssetFactory.loadAnimationSet("animationSets/person.json")
+	person = AssetFactory.loadAnimationSet("person")
 
 	player = Entity.make(person)
 	player.behaviors.push behaviors.playerInput
 	player.moveTo 8, 8
 	player.addToDisplay display(4)
 
-	player = applyRace(player)
-	player = applyClass(player)
+	player = applyRace(player, "human")
+	player = applyClass(player, "fighter")
 
 	entities.push player
 end function
@@ -138,8 +139,8 @@ end function
 initialize
 
 // The environment needs to be basically setup before a game can either be initialized or loaded.
-// newGame
-loadGame "save.json"
+newGame
+// loadGame "save.json"
 
 // Start the main loop.
 main

@@ -2,12 +2,10 @@ Entity = {}
 
 Entity.make = function(animationSet)
 	self = new Entity
+	self.name = "Entity"
 	self.currentState = "still"
 	self.currentEnergy = 0
 	self.maxEnergy = 100
-
-	// Race and class attributes applied after construction...?
-	self.constitution = 0
 	
 	self.animations = animationSet
 	self.animations.setCurrent self.currentState
@@ -15,6 +13,19 @@ Entity.make = function(animationSet)
 	self.sprite.image = self.animations.getImage
 	self.sprite.x = 0
 	self.sprite.y = 0
+
+	// Race and class attributes applied after construction...?
+	self.raceName = ""
+	self.className = ""
+
+	self.baseArmorClass = 0
+	self.hp = 0
+	self.strength = 0
+	self.dexterity = 0
+	self.constitution = 0
+	self.intelligence = 0
+	self.wisdom = 0
+	self.charisma = 0
 
 	// This is where the AI gets stuffed.  Player input is a type of "AI".  Sorry.
 	self.behaviors = []

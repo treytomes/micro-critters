@@ -1,0 +1,11 @@
+{
+	"name": "kobold",
+	"baseArmorClass": 12,
+	"hp": "5",
+	"strength": "7",
+	"dexterity": "15",
+	"constitution": "9",
+	"intelligence": "8",
+	"wisdom": "7",
+	"charisma": "8"
+}

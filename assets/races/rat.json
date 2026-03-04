@@ -1,0 +1,11 @@
+{
+	"name": "rat",
+	"baseArmorClass": 10,
+	"hp": "1",
+	"strength": "2",
+	"dexterity": "11",
+	"constitution": "10",
+	"intelligence": "2",
+	"wisdom": "10",
+	"charisma": "2"
+}
