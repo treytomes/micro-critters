@@ -15,11 +15,21 @@ ENTITY_BORED_TIME = 3
 //
 ASSET_ROOT = "/usr/assets/"
 
+
+// The engine will take this many seconds to move the next level into view.
+//
+SCREEN_TRANSITION_TIME = 1.5
+
+
 // The world is composed of a 3D cube of "chunks".
 
 // The width of a single chunk.
 //
 CHUNK_WIDTH = 64
+
+
+// The height of a single chunk.
+//
 CHUNK_HEIGHT = 64
 
 
