@@ -79,7 +79,7 @@ Entity.addToDisplay = function(dsp)
 end function
 
 Entity.moveTo = function(tx, ty)
-	self.sprite.x = (tx - 0.5) * self.sprite.image.width
+	self.sprite.x = (tx + 0.5) * self.sprite.image.width
 	self.sprite.y = (ty + 0.5) * self.sprite.image.height
 end function
 
@@ -89,11 +89,13 @@ Entity.moveBy = function(dtx, dty)
 end function
 
 Entity.getTileX = function
-	return floor(self.sprite.x / self.sprite.image.width)
+	spriteX = self.sprite.x - self.sprite.image.width / 2
+	return floor(spriteX / self.sprite.image.width)
 end function
 
 Entity.getTileY = function
-	return floor(self.sprite.y / self.sprite.image.height)
+	spriteY = self.sprite.y - self.sprite.image.height / 2
+	return floor(spriteY / self.sprite.image.height)
 end function
 
 // @returns {WorldAction[]} A list of actions to add to the world queue.
