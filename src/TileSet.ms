@@ -11,28 +11,28 @@ TileSet.make = function(image, tileWidth, tileHeight)
 end function
 
 TileSet.fromTiles = function(tiles)
+	pd = new PixelDisplay
+	pd.clear 
+
+	self = new TileSet
 	self.tileWidth = tiles[0].width
 	self.tileHeight = tiles[0].height
 	self.tiles = []
-	
-	self = new TileSet
-	self.image = Image.create(self.tileWidth * len(tiles), self.tileHeight, color.purple)
+
+	width = self.tileWidth * len(tiles)
+	height = self.tileHeight
+	pd.clear color.black, width, height
 	
 	x = 0
 	for tile in tiles
 		img = tile.image
 		qa.assert img.width == self.tileWidth and img.height == self.tileHeight, "Tile sizes must match."
-
-		for dy in range(0, self.tileHeight - 1)
-			for dx in range(0, self.tileWidth - 1)
-				c = img.pixel(dx, dy)
-				self.image.setPixel x + dx, dy, c
-			end for
-		end for
+		pd.drawImage img, x, 0, self.tileWidth, self.tileHeight
 
 		x += self.tileWidth
 	end for
-
+	
+	self.image = pd.getImage(0, 0, width, height)
 	self.len = floor(self.image.width / self.tileWidth) * floor(self.image.height / self.tileHeight)
 	return self
 end function
