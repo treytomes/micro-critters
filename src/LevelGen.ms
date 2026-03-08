@@ -3,12 +3,17 @@
 // Defines tile colors used by the terrain generator
 // ======================================================
 Tile = {}
-Tile.water  = color.fromList([0, 0, 128])
+
+// Shallow coastal water
+Tile.shallowWater = color.fromList([0, 64, 160])
+
+// Deep ocean water
+Tile.deepWater = color.fromList([0, 0, 64])
+
 Tile.sand   = color.fromList([194, 178, 128])
 Tile.grass  = color.fromList([34, 180, 34])
 Tile.rock   = color.fromList([160, 160, 160])
 Tile.tree   = color.fromList([0, 48, 0])
-// Tile.stairs = color.fromList([255, 255, 255])
 
 // ======================================================
 // Random.ms
@@ -94,40 +99,53 @@ if locals == globals then
     import "mathUtil"
 end if
 
+// ======================================================
+// TopMap.ms
+// Generates an overworld terrain map with water depth
+// ======================================================
 generateTopMap = function(w, h, seed)
     rnd(seed)
 
-    // Base noise
-    noise1 = generateNoise(w, h, 32)
-    noise2 = generateNoise(w, h, 32)
+    // --------------------------------------------------
+    // Noise layers
+    // --------------------------------------------------
+    base1 = generateNoise(w, h, 32)
+    base2 = generateNoise(w, h, 32)
 
-    // Rock mask noise
-    mnoise1 = generateNoise(w, h, 16)
-    mnoise2 = generateNoise(w, h, 16)
-    mnoise3 = generateNoise(w, h, 16)
+    rock1 = generateNoise(w, h, 16)
+    rock2 = generateNoise(w, h, 16)
+    rock3 = generateNoise(w, h, 16)
 
     map = []
 
-    // Base terrain
+    // --------------------------------------------------
+    // Base elevation classification
+    // --------------------------------------------------
     for y in range(0, h-1)
         for x in range(0, w-1)
             i = x + y * w
 
-            val = abs(noise1[i] - noise2[i]) * 3 - 2
+            // Ridge-style elevation
+            elev = abs(base1[i] - base2[i]) * 3 - 2
 
-            mval = abs(mnoise1[i] - mnoise2[i])
-            mval = abs(mval - mnoise3[i]) * 3 - 2
-
+            // Island falloff
             xd = abs(x / (w-1) * 2 - 1)
             yd = abs(y / (h-1) * 2 - 1)
-            dist = mathUtil.max(xd, yd)
-            dist = dist^8
+            dist = mathUtil.max(xd, yd) ^ 8
+            elev = elev + 1 - dist * 20
 
-            val = val + 1 - dist * 20
+            // Rock mask
+            rmask = abs(rock1[i] - rock2[i])
+            rmask = abs(rmask - rock3[i]) * 3 - 2
 
-            if val < -0.5 then
-                map.push "water"
-            else if val > 0.5 and mval < -1.5 then
+            // ------------------------------
+            // Elevation bands
+            // ------------------------------
+            if elev < -1.2 then
+                map.push "deepWater"
+            else if elev < -0.5 then
+                map.push "shallowWater"
+            else if elev > 0.6 and rmask < -1.5 then
                 map.push "rock"
             else
                 map.push "grass"
@@ -135,97 +153,74 @@ generateTopMap = function(w, h, seed)
         end for
     end for
 
-	// ------------------------------------------------------
-	// Sand generation (beaches + deserts)
-	// ------------------------------------------------------
+    // --------------------------------------------------
+    // Enforce shallow water near land
+    // --------------------------------------------------
+    for y in range(1, h-2)
+        for x in range(1, w-2)
+            i = x + y * w
+            if map[i] != "deepWater" then continue
 
-	// 1) Coastal sand: grass adjacent to water becomes sand
-	for y in range(1, h-2)
-		for x in range(1, w-2)
-			i = x + y * w
-			if map[i] != "grass" then continue
+            for yy in range(y-1, y+1)
+                for xx in range(x-1, x+1)
+                    t = map[xx + yy * w]
+                    if t == "grass" or t == "rock" then
+                        map[i] = "shallowWater"
+                    end if
+                end for
+            end for
+        end for
+    end for
 
-			isCoastal = false
-			for yy in range(y-1, y+1)
-				for xx in range(x-1, x+1)
-					if map[xx + yy*w] == "water" then
-						isCoastal = true
-					end if
-				end for
-			end for
+    // --------------------------------------------------
+    // Coastal sand
+    // --------------------------------------------------
+    for y in range(1, h-2)
+        for x in range(1, w-2)
+            i = x + y * w
+            if map[i] != "grass" then continue
 
-			if isCoastal then
-				map[i] = "sand"
-			end if
-		end for
-	end for
+            for yy in range(y-1, y+1)
+                for xx in range(x-1, x+1)
+                    if map[xx + yy * w] == "shallowWater" then
+                        map[i] = "sand"
+                    end if
+                end for
+            end for
+        end for
+    end for
 
-	// 2) Desert seeds (higher density than original Java)
-	desertSeeds = floor(w * h / 400)
-
-	for i in range(0, desertSeeds)
-		xs = randInt(0, w)
-		ys = randInt(0, h)
-
-		for j in range(0, 100)
-			xx = xs + randInt(-12, 13)
-			yy = ys + randInt(-12, 13)
-
-			if xx >= 0 and yy >= 0 and xx < w and yy < h then
-				idx = xx + yy * w
-				if map[idx] == "grass" then
-					map[idx] = "sand"
-				end if
-			end if
-		end for
-	end for
-
-	// 3) Noise-based sand expansion (smooths deserts)
-	for y in range(0, h-1)
-		for x in range(0, w-1)
-			i = x + y * w
-
-			// Only convert grass
-			if map[i] != "grass" then continue
-
-			// Use existing base noise to bias sand
-			if noise1[i] < -0.1 then
-				map[i] = "sand"
-			end if
-		end for
-	end for
-
-    // Trees
-    for i in range(0, w*h/400)
-        x = randInt(0, w)
-        y = randInt(0, h)
-        for j in range(0, 200)
-            xx = x + randInt(-15, 16)
-            yy = y + randInt(-15, 16)
-            if xx >= 0 and yy >= 0 and xx < w and yy < h then
-                idx = xx + yy * w
-                if map[idx] == "grass" then map[idx] = "tree"
+    // --------------------------------------------------
+    // Desert expansion (noise biased)
+    // --------------------------------------------------
+    for y in range(0, h-1)
+        for x in range(0, w-1)
+            i = x + y * w
+            if map[i] != "grass" then continue
+            if base1[i] < -0.1 then
+                map[i] = "sand"
             end if
         end for
     end for
 
-    // // Stairs (must be surrounded by rock)
-    // count = 0
-    // for i in range(0, w*h/100)
-    //     x = randInt(1, w-1)
-    //     y = randInt(1, h-1)
-    //     ok = true
-    //     for yy in range(y-1, y+1)
-    //         for xx in range(x-1, x+1)
-    //             if map[xx + yy*w] != "rock" then ok = false
-    //         end for
-    //     end for
-    //     if ok then
-    //         map[x + y*w] = "stairs"
-    //         count = count + 1
-    //         if count == 4 then break
-    //     end if
-    // end for
+    // --------------------------------------------------
+    // Trees (grass only)
+    // --------------------------------------------------
+    for i in range(0, w*h/400)
+        x0 = randInt(0, w)
+        y0 = randInt(0, h)
+
+        for j in range(0, 200)
+            xx = x0 + randInt(-15, 16)
+            yy = y0 + randInt(-15, 16)
+            if xx < 0 or yy < 0 or xx >= w or yy >= h then continue
+
+            idx = xx + yy * w
+            if map[idx] == "grass" then
+                map[idx] = "tree"
+            end if
+        end for
+    end for
 
     return map
 end function
@@ -244,12 +239,10 @@ validateTopMap = function(map, w, h)
 	print "Attempt="+attempt + " count="+count.get("sand", 0)
 	print "Attempt="+attempt + " count="+count.get("grass", 0)
 	print "Attempt="+attempt + " count="+count.get("tree", 0)
-	// print "Attempt="+attempt + " count="+count.get("stairs", 0)
     if count.get("rock", 0) < 100 then return false
     if count.get("sand", 0) < 100 then return false
     if count.get("grass", 0) < 100 then return false
     if count.get("tree", 0) < 100 then return false
-    // if count.get("stairs", 0) < 2 then return false
 
     return true
 end function
@@ -263,7 +256,7 @@ generateValidatedTopMap = function(w, h, seed)
 end function
 
 drawMap = function(map, w, h)
-	gfx.scale = 4
+	gfx.scale = 2
     for y in range(0, h-1)
         for x in range(0, w-1)
             i = x + y * w
@@ -273,8 +266,8 @@ drawMap = function(map, w, h)
 end function
 
 runDemo = function
-    w = 128
-    h = 128
+    w = 256
+    h = 256
     seed = floor(time)
     map = generateValidatedTopMap(w, h, seed)
     drawMap(map, w, h)
