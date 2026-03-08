@@ -5,6 +5,9 @@
 Tile = {}
 
 // Shallow coastal water
+Tile.river = color.fromList([0, 80, 160])
+
+// Shallow coastal water
 Tile.shallowWater = color.fromList([0, 64, 160])
 
 // Deep ocean water
@@ -100,8 +103,13 @@ if locals == globals then
 end if
 
 // ======================================================
-// TopMap.ms
-// Generates an overworld terrain map with water depth
+// generateTopMap
+// Generates an overworld terrain map with elevation,
+// water depth, deserts, rivers, and vegetation
+// ======================================================
+// ======================================================
+// generateTopMap
+// Overworld terrain generator with rivers + polish
 // ======================================================
 generateTopMap = function(w, h, seed)
     rnd(seed)
@@ -117,15 +125,15 @@ generateTopMap = function(w, h, seed)
     rock3 = generateNoise(w, h, 16)
 
     map = []
+    elevation = []
 
     // --------------------------------------------------
-    // Base elevation classification
+    // Base elevation + biome classification
     // --------------------------------------------------
     for y in range(0, h-1)
         for x in range(0, w-1)
             i = x + y * w
 
-            // Ridge-style elevation
             elev = abs(base1[i] - base2[i]) * 3 - 2
 
             // Island falloff
@@ -134,13 +142,12 @@ generateTopMap = function(w, h, seed)
             dist = mathUtil.max(xd, yd) ^ 8
             elev = elev + 1 - dist * 20
 
+            elevation.push elev
+
             // Rock mask
             rmask = abs(rock1[i] - rock2[i])
             rmask = abs(rmask - rock3[i]) * 3 - 2
 
-            // ------------------------------
-            // Elevation bands
-            // ------------------------------
             if elev < -1.2 then
                 map.push "deepWater"
             else if elev < -0.5 then
@@ -154,7 +161,7 @@ generateTopMap = function(w, h, seed)
     end for
 
     // --------------------------------------------------
-    // Enforce shallow water near land
+    // Enforce shallow water along coasts
     // --------------------------------------------------
     for y in range(1, h-2)
         for x in range(1, w-2)
@@ -163,7 +170,7 @@ generateTopMap = function(w, h, seed)
 
             for yy in range(y-1, y+1)
                 for xx in range(x-1, x+1)
-                    t = map[xx + yy * w]
+                    t = map[xx + yy*w]
                     if t == "grass" or t == "rock" then
                         map[i] = "shallowWater"
                     end if
@@ -173,7 +180,98 @@ generateTopMap = function(w, h, seed)
     end for
 
     // --------------------------------------------------
-    // Coastal sand
+    // River generation (downhill with wandering)
+    // --------------------------------------------------
+    riverCount = floor(w * h / 6000)
+    maxRiverLength = (w + h) * 1
+
+    for r in range(0, riverCount)
+        // Pick a mountain source
+        for tries in range(0, 100)
+            sx = randInt(0, w)
+            sy = randInt(0, h)
+            si = sx + sy * w
+            if map[si] == "river" or (map[si] == "rock" and elevation[si] > 0.8) then break
+        end for
+
+        cx = sx
+        cy = sy
+
+        for step in range(0, maxRiverLength)
+            i = cx + cy * w
+
+            // Stop at sea
+            if map[i] == "shallowWater" or map[i] == "deepWater" then break
+
+            // Carve river
+            if map[i] == "grass" or map[i] == "sand" then
+                map[i] = "river"
+            end if
+
+            currentH = elevation[i]
+            candidates = []
+
+            // Wander allowance increases on flat land
+            wanderAllowance = 0.03
+            if currentH < 0.3 then wanderAllowance = 0.08
+
+            for yy in range(cy-1, cy+1)
+                for xx in range(cx-1, cx+1)
+                    if xx < 0 or yy < 0 or xx >= w or yy >= h then continue
+                    if xx == cx and yy == cy then continue
+
+                    ni = xx + yy * w
+                    dh = elevation[ni] - currentH
+
+                    // Prefer downhill, allow slight uphill wander
+                    if dh <= wanderAllowance then
+                        candidates.push [xx, yy, elevation[ni]]
+                    end if
+                end for
+            end for
+
+            if candidates.len == 0 then break
+
+            // Sort lowest first
+			sortFn = function(a, b)
+				return a[2] < b[2]
+			end function
+            candidates.sort(@sortFn)
+
+            // Strong downhill bias with occasional wandering
+            if rnd() < 0.7 then
+                choice = candidates[0]
+            else
+                choice = candidates[randInt(0, candidates.len)]
+            end if
+
+            cx = choice[0]
+            cy = choice[1]
+        end for
+    end for
+
+    // // --------------------------------------------------
+    // // River widening (lowland only)
+    // // --------------------------------------------------
+    // for y in range(1, h-2)
+    //     for x in range(1, w-2)
+    //         i = x + y * w
+    //         if map[i] != "river" then continue
+    //         if elevation[i] > 0.3 then continue
+
+    //         for yy in range(y-1, y+1)
+    //             for xx in range(x-1, x+1)
+    //                 j = xx + yy * w
+    //                 if map[j] == "grass" then
+    //                     map[j] = "river"
+    //                 end if
+    //             end for
+    //         end for
+    //     end for
+    // end for
+
+    // --------------------------------------------------
+    // Sand near water and rivers
     // --------------------------------------------------
     for y in range(1, h-2)
         for x in range(1, w-2)
@@ -182,7 +280,8 @@ generateTopMap = function(w, h, seed)
 
             for yy in range(y-1, y+1)
                 for xx in range(x-1, x+1)
-                    if map[xx + yy * w] == "shallowWater" then
+                    t = map[xx + yy*w]
+                    if t == "shallowWater" or t == "river" then
                         map[i] = "sand"
                     end if
                 end for
@@ -191,7 +290,7 @@ generateTopMap = function(w, h, seed)
     end for
 
     // --------------------------------------------------
-    // Desert expansion (noise biased)
+    // Desert expansion (noise-biased)
     // --------------------------------------------------
     for y in range(0, h-1)
         for x in range(0, w-1)
@@ -204,7 +303,7 @@ generateTopMap = function(w, h, seed)
     end for
 
     // --------------------------------------------------
-    // Trees (grass only)
+    // Trees (avoid sand and rivers)
     // --------------------------------------------------
     for i in range(0, w*h/400)
         x0 = randInt(0, w)
@@ -225,7 +324,7 @@ generateTopMap = function(w, h, seed)
     return map
 end function
 
-attempt = 0
+// attempt = 0
 validateTopMap = function(map, w, h)
     count = {}
     for i in range(0, w*h-1)
@@ -234,11 +333,11 @@ validateTopMap = function(map, w, h)
         count[t] = count[t] + 1
     end for
 
-	globals.attempt += 1
-	print "Attempt="+attempt + " count="+count.get("rock", 0)
-	print "Attempt="+attempt + " count="+count.get("sand", 0)
-	print "Attempt="+attempt + " count="+count.get("grass", 0)
-	print "Attempt="+attempt + " count="+count.get("tree", 0)
+	// globals.attempt += 1
+	// print "Attempt="+attempt + " count="+count.get("rock", 0)
+	// print "Attempt="+attempt + " count="+count.get("sand", 0)
+	// print "Attempt="+attempt + " count="+count.get("grass", 0)
+	// print "Attempt="+attempt + " count="+count.get("tree", 0)
     if count.get("rock", 0) < 100 then return false
     if count.get("sand", 0) < 100 then return false
     if count.get("grass", 0) < 100 then return false
@@ -268,7 +367,7 @@ end function
 runDemo = function
     w = 256
     h = 256
-    seed = floor(time)
+    seed = rnd * 10000 // floor(time)
     map = generateValidatedTopMap(w, h, seed)
     drawMap(map, w, h)
     print "Terrain generation complete. Seed=" + seed
