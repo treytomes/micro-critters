@@ -557,7 +557,7 @@ runDemo = function
 
     w = 256
     h = 256
-    seed = 0 // rnd * 10000
+    seed = rnd * 10000
     globals.world = World.make(w, h, seed)
     text.clear
 
@@ -565,7 +565,6 @@ runDemo = function
     gfx.clear
     miniMap = world.generateMiniMap
     gfx.drawImage miniMap, 0, 0, miniMap.width * scale, miniMap.height * scale
-    // TODO: generate the chunk, then the chunk minimap, then draw the chunk minimap to the right of the world minimap.
 
     chunkScale = 4
 
