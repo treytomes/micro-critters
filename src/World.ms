@@ -8,6 +8,7 @@ if locals == globals then
     import "json"
 	import "mapUtil"
     import "mathUtil"
+    import "PerlinNoise"
     import "qa"
 end if
 
@@ -302,7 +303,7 @@ World.make = function(width, height, seed)
 end function
 
 // Generate a minimap image from the tile data.
-World.generateMiniMap = function(x, y)
+World.generateMiniMap = function
     pd = new PixelDisplay
 	pd.clear color.black, self.width, self.height
     for y in range(0, self.height - 1)
@@ -320,7 +321,7 @@ World.generateMiniMap = function(x, y)
 end function
 
 World.drawMiniMap = function(x, y, scale)
-    image = self.generateMiniMap(x, y)
+    image = self.generateMiniMap
     gfx.drawImage image, x, y, image.width * scale, image.height * scale
 end function
 
@@ -380,18 +381,188 @@ World.loadWorld = function(path)
     return self
 end function
 
+// World.generateChunk
+// Generates a 64x64 chunk whose detail is subordinate to world terrain intent.
+World.generateChunk = function(worldX, worldY)
+    CHUNK_SIZE = 64
+    SUB_DIV = 16   // 4x4 world tiles -> 64x64 chunk
+
+    chunkTiles = []
+
+    for y in range(0, CHUNK_SIZE - 1)
+        for x in range(0, CHUNK_SIZE - 1)
+
+            // World-space pixel coordinates (continuous)
+            px = worldX * SUB_DIV + x
+            py = worldY * SUB_DIV + y
+
+            // World tile coordinates
+            wx = worldX + floor(x / SUB_DIV)
+            wy = worldY + floor(y / SUB_DIV)
+            wx1 = mathUtil.min(wx + 1, self.width - 1)
+            wy1 = mathUtil.min(wy + 1, self.height - 1)
+
+            // World elevation samples
+            e00 = self.elevation[wx  + wy  * self.width]
+            e10 = self.elevation[wx1 + wy  * self.width]
+            e01 = self.elevation[wx  + wy1 * self.width]
+            e11 = self.elevation[wx1 + wy1 * self.width]
+
+            // Bilinear interpolation inside world tile
+            fx = (x % SUB_DIV) / SUB_DIV
+            fy = (y % SUB_DIV) / SUB_DIV
+            baseElev = e00 * (1 - fx) * (1 - fy) +
+                e10 * fx       * (1 - fy) +
+                e01 * (1 - fx) * fy +
+                e11 * fx       * fy
+
+            // World roughness (macro slope)
+            roughness = abs(e10 - e00) +
+                abs(e01 - e00)
+
+            // Detail amplitude scaled to world roughness
+            detailAmp = mathUtil.clamp(roughness * 0.6, 0.04, 0.18)
+
+            // Perlin noise (normalize to [-1, 1])
+            detailNoise = (PerlinNoise.fractalNoise(px, py, 24, 3, 0.4) - 0.5) * 2
+            coastNoise = (PerlinNoise.fractalNoise(px, py, 96, 2, 0.5) - 0.5) * 2
+            rockNoise = (PerlinNoise.fractalNoise(px, py, 32, 3, 0.45) - 0.5) * 2
+
+            // Final elevation (detail is subordinate)
+            elev = baseElev + detailNoise * detailAmp
+
+            parentTile = self.tiles[wx + wy * self.width]
+
+            // Coastal distance field (world-driven)
+            coastField = baseElev * 0.9 +
+                coastNoise * 0.5
+
+            // -----------------------------
+            // Tile resolution (world-biased)
+            // -----------------------------
+            if parentTile == WATER_DEEP_INDEX then
+                if coastField < -0.6 then
+                    tile = WATER_DEEP_INDEX
+                else
+                    tile = WATER_SHALLOW_INDEX
+                end if
+
+            else if parentTile == WATER_SHALLOW_INDEX then
+                if coastField < -0.2 then
+                    tile = WATER_SHALLOW_INDEX
+                else
+                    tile = SAND_INDEX
+                end if
+
+            else if parentTile == SAND_INDEX then
+                if coastField < 0.2 then
+                    tile = SAND_INDEX
+                else
+                    tile = GRASS_INDEX
+                end if
+
+            else
+                // Land refinement
+                if elev > baseElev + 0.15 and rockNoise > 0.25 then
+                    tile = ROCK_INDEX
+                else
+                    tile = GRASS_INDEX
+                    if elev > baseElev and roughness < 0.35 and rockNoise < -0.2 then
+                        tile = TREE_INDEX
+                    end if
+                end if
+            end if
+
+            chunkTiles.push tile
+        end for
+    end for
+
+    return chunkTiles
+end function
+
+// generateChunkImage
+// Builds a minimap image from a 64x64 chunk tile array.
+generateChunkImage = function(chunkTiles)
+    pd = new PixelDisplay
+    pd.clear color.black, 64, 64
+
+    for y in range(0, 63)
+        for x in range(0, 63)
+            i = x + y * 64
+            tileIndex = chunkTiles[i]
+            tileName = World.TileIndex[tileIndex]
+            tileColor = World.Tile[tileName]
+            pd.setPixel x, y, tileColor
+        end for
+    end for
+
+    return pd.getImage(0, 0, 64, 64)
+end function
+
 runDemo = function
     st = time
 
     w = 256
     h = 256
-    seed = rnd * 10000
+    seed = 0 // rnd * 10000
     globals.world = World.make(w, h, seed)
+    text.clear
 
-    world.drawMiniMap 0, 0, 2
+    scale = 1.5
+    gfx.clear
+    miniMap = world.generateMiniMap
+    gfx.drawImage miniMap, 0, 0, miniMap.width * scale, miniMap.height * scale
+    // TODO: generate the chunk, then the chunk minimap, then draw the chunk minimap to the right of the world minimap.
+
+    chunkScale = 4
+
+    cursorX = 68
+    cursorY = 84
+    isBlinking = false
+    while not key.pressed("escape")
+        dx = key.axis("Horizontal")
+        dy = key.axis("Vertical")
+        cursorX += sign(dx) * chunkScale
+        cursorY += sign(dy) * chunkScale
+        if cursorX < 0 then cursorX = 0
+        if cursorY < 0 then cursorY = 0
+        if cursorX >= 256 then cursorX = 256
+        if cursorY >= 256 then cursorY = 256
+
+        if dx != 0 or dy != 0 then
+            gfx.drawImage miniMap, 0, 0, miniMap.width * scale, miniMap.height * scale
+
+            chunkX = cursorX
+            chunkY = cursorY
+
+            chunkTiles = world.generateChunk(chunkX, chunkY)
+            chunkImage = generateChunkImage(chunkTiles)
+
+            gfx.drawImage chunkImage,
+                miniMap.width * scale + 10,
+                0,
+                chunkImage.width * scale * 4,
+                chunkImage.height * scale * 4
+                
+            text.row = 25
+            text.column = 0
+            print "x=" + cursorX + ",y=" + cursorY + "    "
+        end if
+
+        isBlinking = floor(time * 2) % 2
+        if isBlinking then
+            left = (cursorX * scale - scale * chunkScale / 2)
+            bottom = (cursorY * scale - scale * chunkScale / 2)
+            width = scale * 2 * chunkScale
+            height = scale * 2 * chunkScale
+            gfx.fillRect left, bottom, width, height, color.red
+        end if
+
+        wait 1 / 30
+    end while
 
     ft = time
-    print "Terrain generation complete. Seed=" + seed + ", time=" + (ft - st)
+    // print "Terrain generation complete. Seed=" + seed + ", time=" + (ft - st)
 end function
 
 if locals == globals then runDemo
