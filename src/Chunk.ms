@@ -1,53 +1,204 @@
 Chunk = {}
 
-Chunk.make = function(worldX, worldY, worldZ)
-	self = new Chunk
-	
-	self.worldX = worldX
-	self.worldY = worldY
-	self.worldZ = worldZ
+// ======================================================
+// Chunk.make
+// Builds a chunk using overworld tiles + elevation,
+// blended with Perlin noise for local detail.
+// ======================================================
+// @param tileSet {map} Tile set definition.
+// @param world {World} The world definition to generate from.
+// @param worldX {int} Chunk X coordinate in world space.
+// @param worldY {int} Chunk Y coordinate in world space.
+// @param worldZ {int} World layer / depth.
+// @returns Chunk
+// ======================================================
+Chunk.make = function(tileSet, overworld, worldX, worldY, worldZ)
+    self = new Chunk
 
-	self.width = CHUNK_WIDTH
-	self.height = CHUNK_HEIGHT
+    // --- Basic chunk state ---
+    self.worldX = worldX
+    self.worldY = worldY
+    self.worldZ = worldZ
+    self.width = CHUNK_WIDTH      // 64
+    self.height = CHUNK_HEIGHT    // 64
+    self.tileSet = tileSet
 
-	self.tileSet = {}
+    // --- Allocate tile + metadata grids ---
+    self.tiles = []
+    self.metadata = []
+    for y in range(0, self.height - 1)
+        tRow = []
+        mRow = []
+        for x in range(0, self.width - 1)
+            tRow.push 0
+            mRow.push {}
+        end for
+        self.tiles.push tRow
+        self.metadata.push mRow
+    end for
 
-	self.tiles = []
-	self.metadata = []
-	for y in range(0, self.height - 1)
-		t_row = []
-		m_row = []
-		for x in range(0, self.width - 1)
-			t_row.push 0
-			m_row.push {}
-		end for
-		self.tiles.push t_row
-		self.metadata.push m_row
-	end for
+    // --------------------------------------------------
+    // Chunk ↔ overworld mapping
+    // --------------------------------------------------
+    // Chunk covers a 4×4 region of overworld tiles.
+    owX0 = worldX * 4
+    owY0 = worldY * 4
 
-	// Build a simple map.
+    for y in range(0, self.height - 1)
+        for x in range(0, self.width - 1)
 
-	for y in range(0, self.height - 1)
-		for x in range(0, self.width - 1)
-			self.setTile x, y, "floor"
-		end for
-	end for
-	for y in range(0, self.height - 1)
-		self.setTile 0, y, "wall"
-		self.setTile self.width - 1, y, "wall"
-	end for
-	for x in range(0, self.width - 1)
-		self.setTile x, 0, "wall"
-		self.setTile x, self.height - 1, "wall"
-	end for
+            // Normalized chunk coordinates
+            ux = x / self.width
+            uy = y / self.height
 
-	return self
+            // Continuous overworld coordinates
+            owFx = owX0 + ux * 4
+            owFy = owY0 + uy * 4
+
+            // Discrete overworld tile
+            owTx = floor(owFx)
+            owTy = floor(owFy)
+            owIndex = owTx + owTy * overworld.width
+
+            owTileName = World.TileIndex[overworld.tiles[owIndex]]
+
+            // --------------------------------------------------
+            // Sample world elevation (bilinear)
+            // --------------------------------------------------
+            elev = self.sampleWorldElevation(overworld, owFx, owFy)
+
+            // --------------------------------------------------
+            // Local Perlin detail (micro variation)
+            // --------------------------------------------------
+            detail = PerlinNoise.fractalNoise(
+                (worldX * self.width + x) * 0.25,
+                (worldY * self.height + y) * 0.25,
+                32, 3, 0.5, 1)
+
+            finalHeight = elev + (detail - 0.5) * 0.2
+
+            // --------------------------------------------------
+            // Tile selection (biome-aware)
+            // --------------------------------------------------
+            if owTileName == "deepWater" then
+                self.setTile x, y, "waterDeep"
+
+            else if owTileName == "shallowWater" then
+                self.setTile x, y, "waterShallow"
+
+            else if owTileName == "river" then
+                self.setTile x, y, "river"
+
+            else if owTileName == "sand" then
+                self.setTile x, y, "sand"
+
+            else if owTileName == "rock" then
+                if finalHeight > 0.7 then
+                    self.setTile x, y, "wall"
+                else
+                    self.setTile x, y, "rockFloor"
+                end if
+
+            else if owTileName == "grass" or owTileName == "tree" then
+                if finalHeight > 0.75 then
+                    self.setTile x, y, "wall"
+                else if finalHeight > 0.55 and detail > 0.7 then
+                    self.setTile x, y, "tree"
+                else
+                    self.setTile x, y, "grass"
+                end if
+            end if
+
+            // --------------------------------------------------
+            // Metadata (slope, height, traversal)
+            // --------------------------------------------------
+            meta = self.metadata[y][x]
+            meta.height = finalHeight
+            meta.biome = owTileName
+            meta.blocksMovement = (finalHeight > 0.8)
+            meta.walkCost = 1 + abs(detail - 0.5)
+        end for
+    end for
+
+    return self
+end function
+
+// ======================================================
+// sampleWorldElevation
+// Bilinear sampling of overworld elevation.
+// ======================================================
+Chunk.sampleWorldElevation = function(overworld, fx, fy)
+    x0 = floor(fx)
+    y0 = floor(fy)
+    x1 = mathUtil.min(x0 + 1, overworld.width - 1)
+    y1 = mathUtil.min(y0 + 1, overworld.height - 1)
+
+    sx = fx - x0
+    sy = fy - y0
+
+    i00 = x0 + y0 * overworld.width
+    i10 = x1 + y0 * overworld.width
+    i01 = x0 + y1 * overworld.width
+    i11 = x1 + y1 * overworld.width
+
+    e00 = overworld.elevation[i00]
+    e10 = overworld.elevation[i10]
+    e01 = overworld.elevation[i01]
+    e11 = overworld.elevation[i11]
+
+    e0 = e00 * (1 - sx) + e10 * sx
+    e1 = e01 * (1 - sx) + e11 * sx
+    return e0 * (1 - sy) + e1 * sy
+end function
+
+// ======================================================
+// applyOverworldTile
+// Maps overworld biome tiles to chunk tiles.
+// ======================================================
+Chunk.applyOverworldTile = function(x, y, owTileName)
+    if owTileName == "deepWater" then
+        self.setTile x, y, "waterDeep"
+    else if owTileName == "shallowWater" then
+        self.setTile x, y, "waterShallow"
+    else if owTileName == "river" then
+        self.setTile x, y, "river"
+    else if owTileName == "sand" then
+        self.setTile x, y, "sand"
+    else if owTileName == "grass" then
+        self.setTile x, y, "grass"
+    else if owTileName == "tree" then
+        self.setTile x, y, "grass"
+        self.metadata[y][x].treeBias = 1.0
+    else if owTileName == "rock" then
+        self.setTile x, y, "wall"
+    end if
+end function
+
+Chunk.toSerializable = function
+	result = {}
+	result.worldX = self.worldX
+	result.worldY = self.worldY
+	result.worldZ = self.worldZ
+
+	result.width = self.width
+	result.height = self.height
+
+	result.tiles = self.tiles
+	result.metadata = self.metadata
+
+	return result
+end function
+
+Chunk.saveChunk = function
+	path = "/usr/chunk_{worldX}_{worldY}_{worldZ}.json".fill(self)
+	data = self.toSerializable
+	file.writeLines path, json.toJSON(data)
+	return path
 end function
 
 Chunk.render = function(tileDisplay)
-	tileSet = TileSet.fromTiles(self.tileSet.values)
-	tileDisplay.tileSet = tileSet.image
-	tileDisplay.tileSetTileSize = [tileSet.tileWidth, tileSet.tileHeight]  // size of each tile in the image
+	tileDisplay.tileSet = self.tileSet.image
+	tileDisplay.tileSetTileSize = [self.tileSet.tileWidth, self.tileSet.tileHeight]  // size of each tile in the image
 	tileDisplay.cellSize = tileDisplay.tileSetTileSize
 	tileDisplay.extent = [self.width, self.height]
 
@@ -59,31 +210,27 @@ Chunk.render = function(tileDisplay)
 end function
 
 Chunk.setTile = function(x, y, tileName)
-	tile = self.loadTile(tileName)
+    // qa.assert self.tileSet.tileNames.hasIndex(tileName), "this: " + self.tileSet.tileNames
+	tile = self.tileSet.tileNames[tileName]
 	metadata = self.getMetadata(tileName)
 	self.tiles[y][x] = tile
 	self.metadata[y][x] = metadata
 end function
 
-Chunk.loadTile = function(tileName)
-	if not self.tileSet.hasIndex(tileName) then
-		tile = AssetFactory.loadTile(tileName)
-		self.tileSet[tileName] = tile
-	end if
-	return self.tileSet.indexes.indexOf(tileName)
+Chunk.getTile = function(tileName)
+	for t in self.tileSet.tiles
+		if t.metadata.name == tileName then return t
+	end for
+	qa.assert false, "Tile '" + tileName + "' is not defined."
 end function
 
 Chunk.getMetadata = function(tileName)
-	result = {}
-	data = self.loadTile(tileName)
-	for kv in data
-		if kv.key[0].startsWith("_") then continue
-		if kv.key != "image" and not kv.key.contains("Color") then
-			result[kv.key] = Dice.parse(kv.value)
-		else
-			result[kv.key] = kv.value
-		end if
-	end for
+	data = self.getTile(tileName)
+	if data.hasIndex("metadata") then
+		// TODO: return a shallow copy of metadata
+		return data.metadata
+	end if
+	return {}
 end function
 
 return Chunk

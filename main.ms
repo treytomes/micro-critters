@@ -5,6 +5,7 @@ env.importPaths = [
 
 
 import "importUtil"
+import "mapUtil"
 import "mathUtil"
 import "stringUtil"
 import "qa"
@@ -19,15 +20,18 @@ ensureImport "AssetFactory"
 ensureImport "behaviors"
 ensureImport "Chunk"
 ensureImport "Class"
+ensureImport "DiamondSquareNoise"
 ensureImport "Dice"
 ensureImport "Entity"
 ensureImport "Label"
+ensureImport "PerlinNoise"
 ensureImport "Point"
 ensureImport "Race"
 ensureImport "Rectangle"
 ensureImport "Tile"
 ensureImport "TileSet"
 ensureImport "Timer"
+ensureImport "World"
 ensureImport "WorldAction"
 
 
@@ -49,22 +53,32 @@ end function
 initialize = function
 	display(6).mode = displayMode.tile
 
-	c = Chunk.make(0, 0, 0)
-	c.render display(6)
-
 	text.clear
 	gfx.clear
 	display(4).clear
 
 	globals.entities = []
 	globals.worldActions = []
+	globals.chunk = null
 
 	globals.lastFrameTime = time
 	globals.deltaTime = 0
 end function
 
 
+loadChunk = function(worldX, worldY, worldZ)
+	chunkTiles = AssetFactory.loadTileSet("chunkTiles")
+	globals.world = World.make(256, 256, 0)
+	globals.chunk = Chunk.make(chunkTiles, world, worldX, worldY, worldZ)
+	chunk.render display(6)
+	return chunk
+end function
+
+
 newGame = function
+	// loadChunk 0, 0, 0
+	loadChunk 16, 16, 0
+
 	// The set of animations that makes a "person".
 	person = AssetFactory.loadAnimationSet("person")
 
@@ -83,6 +97,9 @@ end function
 loadGame = function(path)
 	data = json.parse(file.open(path).read)
 
+	globals.chunk = Chunk.fromJson(data.currentChunkPath)
+	// globals.chunk = Chunk.fromSerializable(data.currentChunkPath)
+
 	n = 0
 	while n < len(data.entities)
 		e = Entity.fromSerializable(data.entities[n])
@@ -94,13 +111,16 @@ end function
 
 
 saveGame = function(path)
+	currentChunkPath = globals.chunk.saveChunk
+
 	data = {}
+	data.currentChunkPath = currentChunkPath
+
 	data.entities = []
 	n = 0
 	while n < len(entities)
 		e = entities[n]
 		data.entities.push e.toSerializable
-		
 		n += 1
 	end while
 
@@ -144,11 +164,15 @@ end function
 transitionSouth = function(entity)
 	text.clear
 	ss = Image.fromScreen
-	transitionStartTime = time
 	mapHeight = display(6).extent[1] * display(6).cellSize[1]
 	y = 0
+
+	// TODO: Load the new tile map data here.
+	loadChunk chunk.worldX, chunk.worldY - 1, chunk.worldZ
+
 	display(6).scrollY = mapHeight - y
-	// TODO: Load the new tile map data here. 
+
+	transitionStartTime = time
 	while y < gfx.height
 		display(6).scrollY = mapHeight - y
 		gfx.fillRect 0, 0, gfx.width, y, color.clear
@@ -166,11 +190,15 @@ end function
 transitionNorth = function(entity)
 	text.clear
 	ss = Image.fromScreen
-	transitionStartTime = time
 	mapHeight = display(6).extent[1] * display(6).cellSize[1]
 	height = gfx.height
+
+	// TODO: Load the new tile map data here.
+	loadChunk chunk.worldX, chunk.worldY + 1, chunk.worldZ
+
 	display(6).scrollY = -height
-	// TODO: Load the new tile map data here. 
+
+	transitionStartTime = time
 	while height >= 0
 		display(6).scrollY = -height
 		gfx.fillRect 0, height, gfx.width, gfx.height - height, color.clear
@@ -188,11 +216,15 @@ end function
 transitionWest = function(entity)
 	text.clear
 	ss = Image.fromScreen
-	transitionStartTime = time
 	mapWidth = display(6).extent[0] * display(6).cellSize[0]
 	x = 0
+
+	// TODO: Load the new tile map data here.
+	loadChunk chunk.worldX - 1, chunk.worldY, chunk.worldZ
+
 	display(6).scrollX = mapWidth - x
-	// TODO: Load the new tile map data here. 
+
+	transitionStartTime = time
 	while x < gfx.width
 		display(6).scrollX = mapWidth - x
 		gfx.fillRect 0, 0, x, gfx.height, color.clear
@@ -210,11 +242,15 @@ end function
 transitionEast = function(entity)
 	text.clear
 	ss = Image.fromScreen
-	transitionStartTime = time
 	mapWidth = display(6).extent[0] * display(6).cellSize[0]
 	width = gfx.width
+
+	// TODO: Load the new tile map data here.
+	loadChunk chunk.worldX + 1, chunk.worldY, chunk.worldZ
+
 	display(6).scrollX = -width
-	// TODO: Load the new tile map data here. 
+
+	transitionStartTime = time
 	while width >= 0
 		display(6).scrollX = -width
 		gfx.fillRect width, 0, gfx.width - width, gfx.height, color.clear

@@ -1,10 +1,10 @@
 {
 	"tileSet": "fontTiles",
 	"tileIndex": ".",
-	"foregroundColor": "#808080",
-	"backgroundColor": "#000000",
+	"foregroundColor": "#00A000",
+	"backgroundColor": "#008000",
 	"metadata": {
-		"name": "floor",
+		"name": "grass",
 		"blocksMovement": false,
 		"blocksVision": false
 	}

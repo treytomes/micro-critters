@@ -16,14 +16,16 @@ Tile.fromJson = function(path)
 
 	tileIndex = result.tileIndex
 	if tileIndex isa string then tileIndex = code(tileIndex)
-	self.image = tileSet.getTile(tileIndex)
+
+	cloneFrom = tileSet.getTile(tileIndex)
+	self.image = Image.create(cloneFrom.width, cloneFrom.height, color.black)
 	self.width = self.image.width
 	self.height = self.image.height
 
 	for y in range(self.image.height - 1)
 		for x in range(self.image.width - 1)
-			dst_c = self.image.pixel(x, y)
-			if dst_c == null or dst_c == "#00000000" then
+			dst_c = cloneFrom.pixel(x, y)
+			if dst_c == null or dst_c == color.clear or dst_c == color.black then
 				if result.hasIndex("backgroundColor") then
 					self.image.setPixel x, y, result.backgroundColor
 				end if

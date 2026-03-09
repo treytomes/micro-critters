@@ -156,14 +156,14 @@ runDemo = function
     pd = gfx
 
     // Terrain parameters
-    scale = 64
+    scale = 16
     octaves = 4
-    persistence = 0.5
+    persistence = 0.25
     amplitude = 1
 
     for y in range(h - 1)
         for x in range(w - 1)
-            n = fractalNoise(x, y, scale, octaves, persistence, amplitude)
+            n = PerlinNoise.fractalNoise(x, y, scale, octaves, persistence, amplitude)
 
             if n < 0.35 then
                 clr = color.fromList([0, 0, floor(100 + n * 120)])
@@ -185,4 +185,4 @@ end function
 
 if locals == globals then runDemo
 
-return Perlin
+return PerlinNoise

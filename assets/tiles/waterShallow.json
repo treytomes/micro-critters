@@ -1,0 +1,11 @@
+{
+	"tileSet": "fontTiles",
+	"tileIndex": 126,
+	"foregroundColor": "#0000FF",
+	"backgroundColor": "#000080",
+	"metadata": {
+		"name": "waterShallow",
+		"blocksMovement": false,
+		"blocksVision": false
+	}
+}

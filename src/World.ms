@@ -1,197 +1,378 @@
-// World.ms
-// -----------------------------------------------------------------------------
-// Generates and visualizes a 256x256 overworld using Perlin noise.
-// Intended for tuning overworld appearance before chunk integration.
-// -----------------------------------------------------------------------------
-
 if locals == globals then
-	env.importPaths = [
-		"/sys/lib",
-		"/usr/src",
-	]
+    env.importPaths = [
+        "/sys/lib",
+        "/usr/src",
+    ]
 
-	import "PerlinNoise"
+	import "DiamondSquareNoise"
+    import "json"
+	import "mapUtil"
+    import "mathUtil"
+    import "qa"
 end if
-
-// -----------------------------------------------------------------------------
-// World constants
-// -----------------------------------------------------------------------------
-
-WORLD_WIDTH  = 256
-WORLD_HEIGHT = 256
-
-// -----------------------------------------------------------------------------
-// World object
-// -----------------------------------------------------------------------------
 
 World = {}
 
-// @property {number} width World width in cells
-World.width = WORLD_WIDTH
+// ======================================================
+// Defines tile colors used by the terrain generator
+// ======================================================
+World.Tile = {}
 
-// @property {number} height World height in cells
-World.height = WORLD_HEIGHT
+// Shallow coastal water
+World.Tile.river = color.fromList([0, 80, 160])
 
-// @property {list} cells Elevation values [0,1]
-World.cells = []
+// Shallow coastal water
+World.Tile.waterShallow = color.fromList([0, 64, 160])
 
-// -----------------------------------------------------------------------------
-// World generation
-// -----------------------------------------------------------------------------
+// Deep ocean water
+World.Tile.waterDeep = color.fromList([0, 0, 64])
 
-// Generates the overworld elevation map.
-World.generate = function
-    self.cells = []
+World.Tile.sand   = color.fromList([194, 178, 128])
+World.Tile.grass  = color.fromList([34, 180, 34])
+World.Tile.rock   = color.fromList([160, 160, 160])
+World.Tile.tree   = color.fromList([0, 48, 0])
 
-    // --- Terrain detail noise ---
-    detailScale = 96
-    detailOctaves = 5
-    detailPersistence = 0.45
+World.TileIndex = [
+    "waterDeep",
+    "waterShallow",
+    "river",
+    "sand",
+    "grass",
+    "tree",
+    "rock"]
 
-    // --- Continent mask noise ---
-    continentScale = 256
-    continentOctaves = 2
-    continentPersistence = 0.5
+WATER_DEEP_INDEX = World.TileIndex.indexOf("waterDeep")
+WATER_SHALLOW_INDEX = World.TileIndex.indexOf("waterShallow")
+RIVER_INDEX = World.TileIndex.indexOf("river")
+SAND_INDEX = World.TileIndex.indexOf("sand")
+GRASS_INDEX = World.TileIndex.indexOf("grass")
+TREE_INDEX = World.TileIndex.indexOf("tree")
+ROCK_INDEX = World.TileIndex.indexOf("rock")
 
-    // --- Edge ocean parameters ---
-    edgeWidth = 24   // tiles forced toward ocean
-
-    totalProgress = self.width * self.height
-    progress = 0
-    previousPercentage = -1
-
-    for y in range(self.height - 1)
-        row = []
-        for x in range(self.width - 1)
-
-            // Base terrain detail
-            detail = PerlinNoise.fractalNoise(
-                x, y,
-                detailScale,
-                detailOctaves,
-                detailPersistence,
-                1)
-
-            // Low-frequency continent mask
-            continent = PerlinNoise.fractalNoise(
-                x + 10000, y + 10000,
-                continentScale,
-                continentOctaves,
-                continentPersistence,
-                1)
-
-            // Bias continent mask so average land survives
-            continentBias = continent - 0.4
-
-            // Combine signals
-            e = detail - continentBias * 0.55
-
-            // --- Hard ocean edges ---
-            edgeDist = min([ x, y, self.width - 1 - x, self.height - 1 - y ])
-            if edgeDist < edgeWidth then
-                edgeFactor = edgeDist / edgeWidth
-				e = e - (1 - edgeFactor)
-            end if
-
-            // Clamp
-            if e < 0 then e = 0
-            if e > 1 then e = 1
-
-            row.push e
-
-            // Progress meter
-            progress += 1
-            percentage = floor((progress / totalProgress) * 100)
-            if percentage != previousPercentage and (percentage % 10) == 0 then
-                print "Progress: " + percentage
-                previousPercentage = percentage
-            end if
-
-        end for
-        self.cells.push row
-    end for
+randInt = function(min, max)
+    // inclusive min, exclusive max
+    return floor(rnd * (max - min)) + min
 end function
 
-min = function(valueList)
-	result = valueList[0]
-	for n in range(1, len(valueList) - 1)
-		v = valueList[n]
-		if v < result then result = v
-	end for
-	return result
-end function
+// ======================================================
+// generateOverworld
+// Generates an overworld terrain map with elevation,
+// water depth, deserts, rivers, and vegetation
+// ======================================================
+World.generateOverworld = function(w, h, seed)
+    rnd(seed)
+    self.seed = seed
 
-max = function(valueList)
-	result = valueList[0]
-	for n in range(1, len(valueList) - 1)
-		v = valueList[n]
-		if v > result then result = v
-	end for
-	return result
-end function
+    // --------------------------------------------------
+    // Noise layers
+    // --------------------------------------------------
+    base1 = DiamondSquareNoise.noise(w, h, 32)
+    base2 = DiamondSquareNoise.noise(w, h, 32)
 
-// -----------------------------------------------------------------------------
-// Rendering
-// -----------------------------------------------------------------------------
+    rock1 = DiamondSquareNoise.noise(w, h, 16)
+    rock2 = DiamondSquareNoise.noise(w, h, 16)
+    rock3 = DiamondSquareNoise.noise(w, h, 16)
 
-// Renders the world to the main PixelDisplay.
-World.render = function
-    gfx.scale = 2
-    w = floor(gfx.width / gfx.scale)
-    h = floor(gfx.height / gfx.scale)
+    self.width = w
+    self.height = h
+    self.tiles = []
+    self.elevation = []
 
-    for y in range(self.height - 1)
-        for x in range(self.width - 1)
+    // --------------------------------------------------
+    // Base elevation + biome classification
+    // --------------------------------------------------
+    for y in range(0, h-1)
+        for x in range(0, w-1)
+            i = x + y * w
 
-            e = self.cells[y][x]
+            elev = abs(base1[i] - base2[i]) * 3 - 2
 
-            // Color bands
-            if e < 0.20 then
-                // Deep water
-                clr = color.fromList([0, 0, 90])
+            // Island falloff
+            xd = abs(x / (w-1) * 2 - 1)
+            yd = abs(y / (h-1) * 2 - 1)
+            dist = mathUtil.max(xd, yd) ^ 8
+            elev = elev + 1 - dist * 20
 
-            else if e < 0.30 then
-                // Shallow water
-                clr = color.fromList([0, 0, 150])
+            self.elevation.push elev
 
-            else if e < 0.36 then
-                // Sand
-                clr = color.fromList([194, 178, 128])
+            // Rock mask
+            rockMask = abs(rock1[i] - rock2[i])
+            rockMask = abs(rockMask - rock3[i]) * 3 - 2
 
-            else if e < 0.55 then
-                // Grassland
-                clr = color.fromList([40, 170, 40])
-
-            // else if e < 0.70 then
-            //     // Forest
-            //     clr = color.fromList([20, 120, 20])
-
-            else if e < 0.7 then
-                // Mountains
-                c = floor(120 + e * 80)
-                clr = color.fromList([c, c, c])
-
+            if elev < -1.2 then
+                self.tiles.push WATER_DEEP_INDEX
+            else if elev < -0.5 then
+                self.tiles.push WATER_SHALLOW_INDEX
+            else if elev > 0.6 and rockMask < -1.5 then
+                self.tiles.push ROCK_INDEX
             else
-                // Snow
-                clr = color.fromList([240, 240, 240])
+                self.tiles.push GRASS_INDEX
             end if
-
-            gfx.setPixel x, y, clr
         end for
     end for
+
+    // --------------------------------------------------
+    // Enforce shallow water along coasts
+    // --------------------------------------------------
+    for y in range(1, h-2)
+        for x in range(1, w-2)
+            i = x + y * w
+            if self.tiles[i] != WATER_DEEP_INDEX then continue
+
+            for yy in range(y-1, y+1)
+                for xx in range(x-1, x+1)
+                    t = self.tiles[xx + yy*w]
+                    if t == GRASS_INDEX or t == ROCK_INDEX then
+                        self.tiles[i] = WATER_SHALLOW_INDEX
+                    end if
+                end for
+            end for
+        end for
+    end for
+
+    // --------------------------------------------------
+    // River generation (downhill with wandering)
+    // --------------------------------------------------
+    riverCount = floor(w * h / 6000)
+    maxRiverLength = (w + h) * 1
+
+    for r in range(0, riverCount)
+        // Pick a mountain source
+        for tries in range(0, 100)
+            sx = randInt(0, w)
+            sy = randInt(0, h)
+            si = sx + sy * w
+            if self.tiles[si] == RIVER_INDEX or (self.tiles[si] == ROCK_INDEX and self.elevation[si] > 0.8) then break
+        end for
+
+        cx = sx
+        cy = sy
+
+        for step in range(0, maxRiverLength)
+            i = cx + cy * w
+
+            // Stop at sea
+            if self.tiles[i] == WATER_SHALLOW_INDEX or self.tiles[i] == WATER_DEEP_INDEX then break
+
+            // Carve river
+            if self.tiles[i] == GRASS_INDEX or self.tiles[i] == SAND_INDEX then
+                self.tiles[i] = RIVER_INDEX
+            end if
+
+            currentH = self.elevation[i]
+            candidates = []
+
+            // Wander allowance increases on flat land
+            wanderAllowance = 0.03
+            if currentH < 0.3 then wanderAllowance = 0.08
+
+            for yy in range(cy-1, cy+1)
+                for xx in range(cx-1, cx+1)
+                    if xx < 0 or yy < 0 or xx >= w or yy >= h then continue
+                    if xx == cx and yy == cy then continue
+
+                    ni = xx + yy * w
+                    dh = self.elevation[ni] - currentH
+
+                    // Prefer downhill, allow slight uphill wander
+                    if dh <= wanderAllowance then
+                        candidates.push [xx, yy, self.elevation[ni]]
+                    end if
+                end for
+            end for
+
+            if candidates.len == 0 then break
+
+            // Sort lowest first
+			sortFn = function(a, b)
+				return a[2] < b[2]
+			end function
+            candidates.sort(@sortFn)
+
+            // Strong downhill bias with occasional wandering
+            if rnd < 0.7 then
+                choice = candidates[0]
+            else
+                choice = candidates[randInt(0, candidates.len)]
+            end if
+
+            cx = choice[0]
+            cy = choice[1]
+        end for
+    end for
+
+    // --------------------------------------------------
+    // Sand near water and rivers
+    // --------------------------------------------------
+    for y in range(1, h-2)
+        for x in range(1, w-2)
+            i = x + y * w
+            if self.tiles[i] != GRASS_INDEX then continue
+
+            for yy in range(y-1, y+1)
+                for xx in range(x-1, x+1)
+                    t = self.tiles[xx + yy*w]
+                    if t == WATER_SHALLOW_INDEX or t == RIVER_INDEX then
+                        self.tiles[i] = SAND_INDEX
+                    end if
+                end for
+            end for
+        end for
+    end for
+
+    // --------------------------------------------------
+    // Desert expansion (noise-biased)
+    // --------------------------------------------------
+    for y in range(0, h-1)
+        for x in range(0, w-1)
+            i = x + y * w
+            if self.tiles[i] != GRASS_INDEX then continue
+            if base1[i] < -0.1 then
+                self.tiles[i] = SAND_INDEX
+            end if
+        end for
+    end for
+
+    // --------------------------------------------------
+    // Trees (avoid sand and rivers)
+    // --------------------------------------------------
+    for i in range(0, w*h/400)
+        x0 = randInt(0, w)
+        y0 = randInt(0, h)
+
+        for j in range(0, 200)
+            xx = x0 + randInt(-15, 16)
+            yy = y0 + randInt(-15, 16)
+            if xx < 0 or yy < 0 or xx >= w or yy >= h then continue
+
+            idx = xx + yy * w
+            if self.tiles[idx] == GRASS_INDEX then
+                self.tiles[idx] = TREE_INDEX
+            end if
+        end for
+    end for
+
+    return self.tiles
 end function
 
-// -----------------------------------------------------------------------------
-// Demo
-// -----------------------------------------------------------------------------
+World.validateOverworld = function
+    count = {}
+    for i in range(0, self.width * self.height - 1)
+        t = self.tiles[i]
+        if not count.hasIndex(t) then count[t] = 0
+        count[t] = count[t] + 1
+    end for
+
+    if count.get(ROCK_INDEX, 0) < 100 then return false
+    if count.get(SAND_INDEX, 0) < 100 then return false
+    if count.get(GRASS_INDEX, 0) < 100 then return false
+    if count.get(TREE_INDEX, 0) < 100 then return false
+
+    return true
+end function
+
+World.make = function(w, h, seed)
+    seed = floor(seed)
+    self = new World
+    while true
+        self.generateOverworld(w, h, seed)
+        if self.validateOverworld then break
+        seed = seed + 1
+    end while
+    return self
+end function
+
+// Generate a minimap image from the tile data.
+World.generateMiniMap = function(x, y)
+    pd = new PixelDisplay
+	pd.clear color.black, self.width, self.height
+    for y in range(0, self.height - 1)
+        for x in range(0, self.width - 1)
+            i = x + y * self.width
+            tileIndex = self.tiles[i]
+            // qa.assert tileIndex isa number, "tileIndex=" + tileIndex
+            tileName = World.TileIndex[tileIndex]
+            tileColor = World.Tile[tileName]
+            pd.setPixel x, y, tileColor
+        end for
+    end for
+    image = pd.getImage(0, 0, self.width, self.height)
+    return image
+end function
+
+World.drawMiniMap = function(x, y, scale)
+    image = self.generateMiniMap(x, y)
+    gfx.drawImage image, x, y, image.width * scale, image.height * scale
+end function
+
+World.saveWorld = function
+	path = "/usr/world_{seed}.raw".fill(self)
+	
+    data = new RawData
+    SIZEOF_BYTE = 1
+    SIZEOF_INT = 4 // an integer is roughly 4 bytes?
+    SIZEOF_FLOAT = 4
+    data.resize SIZEOF_INT * 4 + len(self.tiles) * SIZEOF_BYTE
+    
+    offset = 0
+    data.setInt offset, self.seed; offset += SIZEOF_INT
+    data.setInt offset, self.width; offset += SIZEOF_INT
+    data.setInt offset, self.height; offset += SIZEOF_INT
+    data.setInt offset, len(self.tiles); offset += SIZEOF_INT
+    for n in range(0, len(self.tiles) - 1)
+        data.setByte offset, self.tiles[n]
+        offset += SIZEOF_BYTE
+    end for
+    data.setInt offset, len(self.elevation); offset += SIZEOF_INT
+    for n in range(0, len(self.elevation) - 1)
+        data.setFloat offset, self.elevation[n]
+        offset += SIZEOF_FLOAT
+    end for
+
+    file.saveRaw path, data
+
+	return path
+end function
+
+World.loadWorld = function(path)
+    data = file.loadRaw(path)
+    SIZEOF_BYTE = 1
+    SIZEOF_INT = 4 // an integer is roughly 4 bytes?
+    SIZEOF_FLOAT = 4
+    offset = 0
+
+    self = new World
+    self.seed = data.int(offset); offset += SIZEOF_INT
+    self.width = data.int(offset); offset += SIZEOF_INT
+    self.height = data.int(offset); offset += SIZEOF_INT
+    tilesLen = data.int(offset); offset += SIZEOF_INT
+    self.tiles = []
+    for n in range(0, tilesLen - 1)
+        self.tiles.push data.byte(offset)
+        offset += SIZEOF_BYTE
+    end for
+    elevationsLen = data.int(offset); offset += SIZEOF_INT
+    self.elevation = []
+    for n in range(0, elevationsLen - 1)
+        self.elevation.push data.float(offset)
+        offset += SIZEOF_FLOAT
+    end for
+
+    return self
+end function
 
 runDemo = function
-    text.clear
-    print "Generating overworld..."
-    World.generate
-    print "Rendering overworld..."
-    World.render
-    print "World generation complete."
+    st = time
+
+    w = 256
+    h = 256
+    seed = rnd * 10000
+    globals.world = World.make(w, h, seed)
+
+    world.drawMiniMap 0, 0, 2
+
+    ft = time
+    print "Terrain generation complete. Seed=" + seed + ", time=" + (ft - st)
 end function
 
 if locals == globals then runDemo

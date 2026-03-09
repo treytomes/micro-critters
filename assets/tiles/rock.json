@@ -4,7 +4,7 @@
 	"foregroundColor": "#A0A0A0",
 	"backgroundColor": "#808080",
 	"metadata": {
-		"name": "wall",
+		"name": "rock",
 		"blocksMovement": true,
 		"blocksVision": true
 	}

@@ -1,17 +1,17 @@
 AssetFactory = {}
 
-TYPE_MAP = {}
-TYPE_MAP.Animation = "animations"
-TYPE_MAP.AnimationSet = "animationSets"
-TYPE_MAP.Class = "classes"
-TYPE_MAP.Image = "images"
-TYPE_MAP.Race = "races"
-TYPE_MAP.Tile = "tiles"
-TYPE_MAP.TileSet = "tileSets"
+AssetFactory.TYPE_MAP = {}
+AssetFactory.TYPE_MAP.Animation = "animations"
+AssetFactory.TYPE_MAP.AnimationSet = "animationSets"
+AssetFactory.TYPE_MAP.Class = "classes"
+AssetFactory.TYPE_MAP.Image = "images"
+AssetFactory.TYPE_MAP.Race = "races"
+AssetFactory.TYPE_MAP.Tile = "tiles"
+AssetFactory.TYPE_MAP.TileSet = "tileSets"
 
-EXT_MAP = {}
-EXT_MAP.default = "json"
-EXT_MAP.Image = "png"
+AssetFactory.EXT_MAP = {}
+AssetFactory.EXT_MAP.default = "json"
+AssetFactory.EXT_MAP.Image = "png"
 
 AssetFactory.assets = {}
 AssetFactory.animations = {}
@@ -22,7 +22,7 @@ AssetFactory.animations = {}
 // @param {string} type The type name or path segment.
 // @returns {string} The normalized path segment.
 AssetFactory.normalizeType = function(type)
-	return TYPE_MAP.get(type, type)
+	return AssetFactory.TYPE_MAP.get(type, type)
 end function
 
 // Normalize the file extension on a path.
@@ -33,7 +33,7 @@ end function
 // @returns {string} The normalized path.
 AssetFactory.normalizeExtension = function(path, type)
 	if path.contains(".") then return path
-	ext = EXT_MAP.get(type, EXT_MAP.default)
+	ext = AssetFactory.EXT_MAP.get(type, AssetFactory.EXT_MAP.default)
 	return path + "." + ext
 end function
 
@@ -93,27 +93,6 @@ AssetFactory.loadTile = function(path)
 	result = Tile.fromJson(path)
 	self.assets[path] = result
 	return result
-
-	// result = json.parse(file.open(path).read)
-	// tileSet = self.loadTileSet(result.tileSet)
-
-	// tileIndex = result.tileIndex
-	// if tileIndex isa string then tileIndex = code(tileIndex)
-	// imageTile = tileSet.getTile(tileIndex)
-
-	// for y in range(imageTile.height - 1)
-	// 	for x in range(imageTile.width - 1)
-	// 		dst_c = imageTile.pixel(x, y)
-	// 		if dst_c == null or dst_c == "#00000000" then
-	// 			if result.hasIndex("backgroundColor") then imageTile.setPixel x, y, result.backgroundColor
-	// 		else
-	// 			if result.hasIndex("foregroundColor") then imageTile.setPixel x, y, result.foregroundColor
-	// 		end if
-	// 	end for
-	// end for
-
-	// self.assets[path] = imageTile
-	// return imageTile
 end function
 
 AssetFactory.loadAnimation = function(path)
