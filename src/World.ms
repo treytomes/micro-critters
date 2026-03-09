@@ -383,88 +383,116 @@ end function
 
 // World.generateChunk
 // Generates a 64x64 chunk whose detail is subordinate to world terrain intent.
+// Rivers are carved as continuous connected polylines (tile-edge based).
 World.generateChunk = function(worldX, worldY)
     CHUNK_SIZE = 64
-    SUB_DIV = 16   // 4x4 world tiles -> 64x64 chunk
+    SUB_DIV = 16
+    RIVER_RADIUS = SUB_DIV * 0.6
 
     chunkTiles = []
 
     for y in range(0, CHUNK_SIZE - 1)
         for x in range(0, CHUNK_SIZE - 1)
 
-            // World-space pixel coordinates (continuous)
+            // --------------------------------------------------
+            // Coordinate setup
+            // --------------------------------------------------
             px = worldX * SUB_DIV + x
             py = worldY * SUB_DIV + y
 
-            // World tile coordinates
             wx = worldX + floor(x / SUB_DIV)
             wy = worldY + floor(y / SUB_DIV)
             wx1 = mathUtil.min(wx + 1, self.width - 1)
             wy1 = mathUtil.min(wy + 1, self.height - 1)
 
-            // World elevation samples
+            // --------------------------------------------------
+            // World elevation (bilinear)
+            // --------------------------------------------------
             e00 = self.elevation[wx  + wy  * self.width]
             e10 = self.elevation[wx1 + wy  * self.width]
             e01 = self.elevation[wx  + wy1 * self.width]
             e11 = self.elevation[wx1 + wy1 * self.width]
 
-            // Bilinear interpolation inside world tile
             fx = (x % SUB_DIV) / SUB_DIV
             fy = (y % SUB_DIV) / SUB_DIV
+
             baseElev = e00 * (1 - fx) * (1 - fy) +
-                       e10 * fx       * (1 - fy) +
-                       e01 * (1 - fx) * fy +
-                       e11 * fx       * fy
+                e10 * fx       * (1 - fy) +
+                e01 * (1 - fx) * fy +
+                e11 * fx       * fy
 
-            // World roughness (macro slope)
             roughness = abs(e10 - e00) + abs(e01 - e00)
-
-            // Detail amplitude scaled to world roughness
             detailAmp = mathUtil.clamp(roughness * 0.6, 0.04, 0.18)
 
-            // Perlin noise (normalize to [-1, 1])
+            // --------------------------------------------------
+            // Noise
+            // --------------------------------------------------
             detailNoise = (PerlinNoise.fractalNoise(px, py, 24, 3, 0.4) - 0.5) * 2
-            coastNoise = (PerlinNoise.fractalNoise(px, py, 96, 2, 0.5) - 0.5) * 2
-            rockNoise = (PerlinNoise.fractalNoise(px, py, 32, 3, 0.45) - 0.5) * 2
+            coastNoise  = (PerlinNoise.fractalNoise(px, py, 96, 2, 0.5) - 0.5) * 2
+            rockNoise   = (PerlinNoise.fractalNoise(px, py, 32, 3, 0.45) - 0.5) * 2
 
-            parentTile = self.tiles[wx + wy * self.width]
-
-            // Final elevation (detail is subordinate)
             elev = baseElev + detailNoise * detailAmp
-
-            // Coastal distance field (world-driven)
             coastField = baseElev * 0.9 + coastNoise * 0.5
 
             // --------------------------------------------------
-            // River proximity field (pixel-accurate carving)
+            // River carving via connected edges
             // --------------------------------------------------
-            riverDist = 999
-            RIVER_RADIUS = SUB_DIV * 1.2   // ~1.2 world tiles wide
+            minDist = 999
 
             for ry in range(wy - 2, wy + 2)
                 for rx in range(wx - 2, wx + 2)
                     if rx < 0 or ry < 0 or rx >= self.width or ry >= self.height then continue
-                    if self.tiles[rx + ry * self.width] == RIVER_INDEX then
-                        // River tile center in pixel space
-                        rcx = rx * SUB_DIV + SUB_DIV / 2
-                        rcy = ry * SUB_DIV + SUB_DIV / 2
-                        dx = px - rcx
-                        dy = py - rcy
-                        d = sqrt(dx * dx + dy * dy)
-                        riverDist = mathUtil.min(riverDist, d)
-                    end if
+                    if self.tiles[rx + ry * self.width] != RIVER_INDEX then continue
+
+                    cElev = self.elevation[rx + ry * self.width]
+                    cx = rx * SUB_DIV + SUB_DIV / 2
+                    cy = ry * SUB_DIV + SUB_DIV / 2
+
+                    // For each downstream neighbor, create one edge
+                    for ny in range(ry - 1, ry + 1)
+                        for nx in range(rx - 1, rx + 1)
+                            if nx == rx and ny == ry then continue
+                            if nx < 0 or ny < 0 or nx >= self.width or ny >= self.height then continue
+                            if self.tiles[nx + ny * self.width] != RIVER_INDEX then continue
+
+                            ni = nx + ny * self.width
+                            if self.elevation[ni] >= cElev then continue  // downstream only
+
+                            nxp = nx * SUB_DIV + SUB_DIV / 2
+                            nyp = ny * SUB_DIV + SUB_DIV / 2
+
+                            // Segment endpoints
+                            sx0 = cx
+                            sy0 = cy
+                            sx1 = nxp
+                            sy1 = nyp
+
+                            vx = sx1 - sx0
+                            vy = sy1 - sy0
+                            len2 = vx * vx + vy * vy
+                            if len2 == 0 then continue
+
+                            // Project pixel onto segment
+                            t = ((px - sx0) * vx + (py - sy0) * vy) / len2
+                            t = mathUtil.clamp(t, 0, 1)
+
+                            qx = sx0 + vx * t
+                            qy = sy0 + vy * t
+
+                            dx = px - qx
+                            dy = py - qy
+                            dist = sqrt(dx * dx + dy * dy)
+
+                            minDist = mathUtil.min(minDist, dist)
+                        end for
+                    end for
                 end for
             end for
 
             riverCarve = 0
-            if riverDist < RIVER_RADIUS then
-                t = 1 - riverDist / RIVER_RADIUS
-                // Smoothstep curve
+            if minDist < RIVER_RADIUS then
+                t = 1 - minDist / RIVER_RADIUS
                 riverCarve = t * t * (3 - 2 * t)
-            end if
-
-            if riverDist < SUB_DIV * 0.4 then
-                coastField = mathUtil.min(coastField, -0.6)
             end if
 
             if riverCarve > 0 then
@@ -472,17 +500,20 @@ World.generateChunk = function(worldX, worldY)
                 coastField -= riverCarve * 1.4
             end if
 
-            // -----------------------------
-            // Tile resolution (world-biased)
-            // -----------------------------
+            // Force wet core
+            if minDist < SUB_DIV * 0.25 then
+                coastField = mathUtil.min(coastField, -0.6)
+            end if
+
+            // --------------------------------------------------
+            // Tile resolution
+            // --------------------------------------------------
             if coastField < -1.2 then
                 tile = WATER_DEEP_INDEX
             else if coastField < -0.45 then
                 tile = WATER_SHALLOW_INDEX
             else if elev < -0.1 or coastField < -0.4 then
                 tile = SAND_INDEX
-
-            // Land refinement
             else if elev > 0.6 and rockNoise > 0.05 then
                 tile = ROCK_INDEX
             else
@@ -582,13 +613,15 @@ runDemo = function
             print "x=" + cursorX + ",y=" + cursorY + "    "
         end if
 
-        isBlinking = floor(time * 2) % 2
+        left = (cursorX * scale - scale * chunkScale / 2)
+        bottom = (cursorY * scale - scale * chunkScale / 2)
+        width = scale * 2 * chunkScale
+        height = scale * 2 * chunkScale
+        isBlinking = floor(time) % 2
         if isBlinking then
-            left = (cursorX * scale - scale * chunkScale / 2)
-            bottom = (cursorY * scale - scale * chunkScale / 2)
-            width = scale * 2 * chunkScale
-            height = scale * 2 * chunkScale
-            gfx.fillRect left, bottom, width, height, color.red
+            gfx.drawRect left, bottom, width, height, color.red
+        else
+            gfx.drawRect left, bottom, width, height, color.yellow
         end if
 
         wait 1 / 30
