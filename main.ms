@@ -35,6 +35,10 @@ ensureImport "World"
 ensureImport "WorldAction"
 
 
+chunk = null
+world = null
+
+
 // You *could* think of race and class as external mutators.  If that helps.
 
 applyRace = function(entity, racePath)
@@ -49,6 +53,7 @@ applyClass = function(entity, classPath)
 	class.apply entity
 	return entity
 end function
+
 
 initialize = function
 	display(6).mode = displayMode.tile
@@ -67,9 +72,26 @@ end function
 
 
 loadChunk = function(worldX, worldY, worldZ)
+	if globals.chunk != null then
+		globals.chunk.saveChunk
+	end if
+
+	if globals.world == null then
+		seed = 0
+		globals.world = World.make(256, 256, seed)
+	end if
+
 	chunkTiles = AssetFactory.loadTileSet("chunkTiles")
-	globals.world = World.make(256, 256, 0)
-	globals.chunk = Chunk.make(chunkTiles, world, worldX, worldY, worldZ)
+
+	path = "/usr/chunk_{0}_{1}_{2}.json".fill([ worldX, worldY, worldZ ])
+	if file.exists(path) then
+		print "Loading chunk from disk for {0},{1},{2}".fill([ worldX,worldY,worldZ ])
+		globals.chunk = Chunk.loadChunk(chunkTiles, worldX, worldY, worldZ)
+	else
+		print "Generating chunk for {0},{1},{2}".fill([ worldX,worldY,worldZ ])
+		globals.chunk = Chunk.make(chunkTiles, world, worldX, worldY, worldZ)
+	end if
+
 	chunk.render display(6)
 	return chunk
 end function
@@ -77,14 +99,14 @@ end function
 
 newGame = function
 	// loadChunk 0, 0, 0
-	loadChunk 16, 16, 0
+	loadChunk 64, 64, 0
 
 	// The set of animations that makes a "person".
 	person = AssetFactory.loadAnimationSet("person")
 
 	globals.player = Entity.make(person)
 	player.behaviors.push behaviors.playerInput
-	player.moveTo 60, 8
+	player.moveTo 24, 44
 	player.addToDisplay display(4)
 
 	applyRace(player, "human")
@@ -167,8 +189,8 @@ transitionSouth = function(entity)
 	mapHeight = display(6).extent[1] * display(6).cellSize[1]
 	y = 0
 
-	// TODO: Load the new tile map data here.
-	loadChunk chunk.worldX, chunk.worldY - 1, chunk.worldZ
+	// Load the new tile map data here.
+	loadChunk chunk.worldX, chunk.worldY - 4, chunk.worldZ
 
 	display(6).scrollY = mapHeight - y
 
@@ -194,7 +216,7 @@ transitionNorth = function(entity)
 	height = gfx.height
 
 	// TODO: Load the new tile map data here.
-	loadChunk chunk.worldX, chunk.worldY + 1, chunk.worldZ
+	loadChunk chunk.worldX, chunk.worldY + 4, chunk.worldZ
 
 	display(6).scrollY = -height
 
@@ -220,7 +242,7 @@ transitionWest = function(entity)
 	x = 0
 
 	// TODO: Load the new tile map data here.
-	loadChunk chunk.worldX - 1, chunk.worldY, chunk.worldZ
+	loadChunk chunk.worldX - 4, chunk.worldY, chunk.worldZ
 
 	display(6).scrollX = mapWidth - x
 
@@ -246,7 +268,7 @@ transitionEast = function(entity)
 	width = gfx.width
 
 	// TODO: Load the new tile map data here.
-	loadChunk chunk.worldX + 1, chunk.worldY, chunk.worldZ
+	loadChunk chunk.worldX + 4, chunk.worldY, chunk.worldZ
 
 	display(6).scrollX = -width
 
@@ -266,10 +288,12 @@ end function
 
 
 main = function
+	worldMiniMap = globals.world.generateMiniMap
+
 	// boredTimerLabel = Label.make("bored timer: {value}", 25, 0, 20)
 	// isBoredLabel = Label.make("is bored: {value}", 24, 0, 15)
 	// energyLabel = Label.make("energy: {value}", 23, 0, 15)
-	positionLabel = Label.make("player: {0},{1}", 25, 0, 15)
+	positionLabel = Label.make("player: {0},{1} ({2},{3})", 25, 0, 25)
 
 	isDone = false
 	while not isDone
@@ -280,7 +304,7 @@ main = function
 		// boredTimerLabel.draw({ "value": entities[0].behaviors[0].boredTimer.remainingTime })
 		// isBoredLabel.draw({ "value": entities[0].behaviors[0].boredTimer.isTriggered })
 		// energyLabel.draw({ "value": entities[0].currentEnergy })
-		positionLabel.draw([player.getTileX, player.getTileY])
+		positionLabel.draw([player.getTileX, player.getTileY, chunk.worldX, chunk.worldY])
 
 		// Animation instances are shared globally, so they need a single update path.
 		AssetFactory.updateAnimations deltaTime
@@ -312,6 +336,19 @@ main = function
 		else
 			scrollTo player
 		end if
+
+		chunkScale = 4
+		gfx.drawImage worldMiniMap, 0, 0, worldMiniMap.width, worldMiniMap.height
+        left = (globals.chunk.worldX - chunkScale / 2)
+        bottom = (globals.chunk.worldY - chunkScale / 2)
+        width = 2 * chunkScale
+        height = 2 * chunkScale
+        isBlinking = floor(time) % 2
+        if isBlinking then
+            gfx.drawRect left, bottom, width, height, color.red
+        else
+            gfx.drawRect left, bottom, width, height, color.yellow
+        end if
 
 		deltaTime = time - lastFrameTime
 		lastFrameTime = time

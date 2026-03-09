@@ -327,55 +327,40 @@ end function
 
 World.saveWorld = function
 	path = "/usr/world_{seed}.raw".fill(self)
-	
-    data = new RawData
-    SIZEOF_BYTE = 1
-    SIZEOF_INT = 4 // an integer is roughly 4 bytes?
-    SIZEOF_FLOAT = 4
-    data.resize SIZEOF_INT * 4 + len(self.tiles) * SIZEOF_BYTE
-    
-    offset = 0
-    data.setInt offset, self.seed; offset += SIZEOF_INT
-    data.setInt offset, self.width; offset += SIZEOF_INT
-    data.setInt offset, self.height; offset += SIZEOF_INT
-    data.setInt offset, len(self.tiles); offset += SIZEOF_INT
+
+    writer = RawFileWriter.make
+    writer.writeInt self.seed
+    writer.writeInt self.width
+    writer.writeInt self.height
+    writer.writeInt len(self.tiles)
     for n in range(0, len(self.tiles) - 1)
-        data.setByte offset, self.tiles[n]
-        offset += SIZEOF_BYTE
+        writer.writeByte self.tiles[n]
     end for
-    data.setInt offset, len(self.elevation); offset += SIZEOF_INT
+    writer.writeInt len(self.elevation)
     for n in range(0, len(self.elevation) - 1)
-        data.setFloat offset, self.elevation[n]
-        offset += SIZEOF_FLOAT
+        writer.writeFloat self.elevation[n]
     end for
 
-    file.saveRaw path, data
-
+    writer.save path
 	return path
 end function
 
 World.loadWorld = function(path)
-    data = file.loadRaw(path)
-    SIZEOF_BYTE = 1
-    SIZEOF_INT = 4 // an integer is roughly 4 bytes?
-    SIZEOF_FLOAT = 4
-    offset = 0
+    reader = RawFileReader.read(path)
 
     self = new World
-    self.seed = data.int(offset); offset += SIZEOF_INT
-    self.width = data.int(offset); offset += SIZEOF_INT
-    self.height = data.int(offset); offset += SIZEOF_INT
-    tilesLen = data.int(offset); offset += SIZEOF_INT
+    self.seed = reader.readInt
+    self.width = reader.readInt
+    self.height = reader.readInt
+    tilesLen = reader.readInt
     self.tiles = []
     for n in range(0, tilesLen - 1)
-        self.tiles.push data.byte(offset)
-        offset += SIZEOF_BYTE
+        self.tiles.push reader.readByte
     end for
-    elevationsLen = data.int(offset); offset += SIZEOF_INT
+    elevationsLen = reader.readInt
     self.elevation = []
     for n in range(0, elevationsLen - 1)
-        self.elevation.push data.float(offset)
-        offset += SIZEOF_FLOAT
+        self.elevation.push reader.readFloat
     end for
 
     return self
