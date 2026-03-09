@@ -514,7 +514,7 @@ World.generateChunk = function(worldX, worldY)
                 tile = WATER_SHALLOW_INDEX
             else if elev < -0.1 or coastField < -0.4 then
                 tile = SAND_INDEX
-            else if elev > 0.6 and rockNoise > 0.05 then
+            else if elev > baseElev - 0.01 and rockNoise > 0.01 then
                 tile = ROCK_INDEX
             else
                 if elev > baseElev and roughness < 0.35 and rockNoise < -0.2 then
@@ -557,7 +557,7 @@ runDemo = function
 
     w = 256
     h = 256
-    seed = rnd * 10000
+    seed = 1341 //rnd * 10000
     globals.world = World.make(w, h, seed)
     text.clear
 
@@ -568,8 +568,8 @@ runDemo = function
 
     chunkScale = 4
 
-    cursorX = 88
-    cursorY = 76
+    cursorX = 84
+    cursorY = 136
 
     chunkTiles = world.generateChunk(cursorX, cursorY)
     chunkImage = generateChunkImage(chunkTiles)
@@ -582,7 +582,7 @@ runDemo = function
     
     text.row = 25
     text.column = 0
-    print "x=" + cursorX + ",y=" + cursorY + "    "
+    print "seed=" + world.seed + ",x=" + cursorX + ",y=" + cursorY + "    "
  
     isBlinking = false
     while not key.pressed("escape")
@@ -609,7 +609,7 @@ runDemo = function
             
             text.row = 25
             text.column = 0
-            print "x=" + cursorX + ",y=" + cursorY + "    "
+            print "seed=" + world.seed + ",x=" + cursorX + ",y=" + cursorY + "    "
         end if
 
         left = (cursorX * scale - scale * chunkScale / 2)
