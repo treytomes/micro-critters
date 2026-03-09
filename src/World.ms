@@ -412,13 +412,12 @@ World.generateChunk = function(worldX, worldY)
             fx = (x % SUB_DIV) / SUB_DIV
             fy = (y % SUB_DIV) / SUB_DIV
             baseElev = e00 * (1 - fx) * (1 - fy) +
-                e10 * fx       * (1 - fy) +
-                e01 * (1 - fx) * fy +
-                e11 * fx       * fy
+                       e10 * fx       * (1 - fy) +
+                       e01 * (1 - fx) * fy +
+                       e11 * fx       * fy
 
             // World roughness (macro slope)
-            roughness = abs(e10 - e00) +
-                abs(e01 - e00)
+            roughness = abs(e10 - e00) + abs(e01 - e00)
 
             // Detail amplitude scaled to world roughness
             detailAmp = mathUtil.clamp(roughness * 0.6, 0.04, 0.18)
@@ -428,48 +427,71 @@ World.generateChunk = function(worldX, worldY)
             coastNoise = (PerlinNoise.fractalNoise(px, py, 96, 2, 0.5) - 0.5) * 2
             rockNoise = (PerlinNoise.fractalNoise(px, py, 32, 3, 0.45) - 0.5) * 2
 
+            parentTile = self.tiles[wx + wy * self.width]
+
             // Final elevation (detail is subordinate)
             elev = baseElev + detailNoise * detailAmp
 
-            parentTile = self.tiles[wx + wy * self.width]
-
             // Coastal distance field (world-driven)
-            coastField = baseElev * 0.9 +
-                coastNoise * 0.5
+            coastField = baseElev * 0.9 + coastNoise * 0.5
+
+            // --------------------------------------------------
+            // River proximity field (pixel-accurate carving)
+            // --------------------------------------------------
+            riverDist = 999
+            RIVER_RADIUS = SUB_DIV * 1.2   // ~1.2 world tiles wide
+
+            for ry in range(wy - 2, wy + 2)
+                for rx in range(wx - 2, wx + 2)
+                    if rx < 0 or ry < 0 or rx >= self.width or ry >= self.height then continue
+                    if self.tiles[rx + ry * self.width] == RIVER_INDEX then
+                        // River tile center in pixel space
+                        rcx = rx * SUB_DIV + SUB_DIV / 2
+                        rcy = ry * SUB_DIV + SUB_DIV / 2
+                        dx = px - rcx
+                        dy = py - rcy
+                        d = sqrt(dx * dx + dy * dy)
+                        riverDist = mathUtil.min(riverDist, d)
+                    end if
+                end for
+            end for
+
+            riverCarve = 0
+            if riverDist < RIVER_RADIUS then
+                t = 1 - riverDist / RIVER_RADIUS
+                // Smoothstep curve
+                riverCarve = t * t * (3 - 2 * t)
+            end if
+
+            if riverDist < SUB_DIV * 0.4 then
+                coastField = mathUtil.min(coastField, -0.6)
+            end if
+
+            if riverCarve > 0 then
+                elev -= riverCarve * 0.8
+                coastField -= riverCarve * 1.4
+            end if
 
             // -----------------------------
             // Tile resolution (world-biased)
             // -----------------------------
-            if parentTile == WATER_DEEP_INDEX then
-                if coastField < -0.6 then
-                    tile = WATER_DEEP_INDEX
-                else
-                    tile = WATER_SHALLOW_INDEX
-                end if
+            if coastField < -1.2 then
+                tile = WATER_DEEP_INDEX
+            else if coastField < -0.45 then
+                tile = WATER_SHALLOW_INDEX
+            else if elev < -0.1 or coastField < -0.4 then
+                tile = SAND_INDEX
 
-            else if parentTile == WATER_SHALLOW_INDEX then
-                if coastField < -0.2 then
-                    tile = WATER_SHALLOW_INDEX
-                else
-                    tile = SAND_INDEX
-                end if
-
-            else if parentTile == SAND_INDEX then
-                if coastField < 0.2 then
-                    tile = SAND_INDEX
-                else
-                    tile = GRASS_INDEX
-                end if
-
+            // Land refinement
+            else if elev > 0.6 and rockNoise > 0.05 then
+                tile = ROCK_INDEX
             else
-                // Land refinement
-                if elev > baseElev + 0.15 and rockNoise > 0.25 then
-                    tile = ROCK_INDEX
+                if elev > baseElev and roughness < 0.35 and rockNoise < -0.2 then
+                    tile = TREE_INDEX
+                else if elev < baseElev - 0.025 then
+                    tile = SAND_INDEX
                 else
                     tile = GRASS_INDEX
-                    if elev > baseElev and roughness < 0.35 and rockNoise < -0.2 then
-                        tile = TREE_INDEX
-                    end if
                 end if
             end if
 
@@ -516,8 +538,22 @@ runDemo = function
 
     chunkScale = 4
 
-    cursorX = 68
-    cursorY = 84
+    cursorX = 88
+    cursorY = 76
+
+    chunkTiles = world.generateChunk(cursorX, cursorY)
+    chunkImage = generateChunkImage(chunkTiles)
+
+    gfx.drawImage chunkImage,
+        miniMap.width * scale + 10,
+        0,
+        chunkImage.width * scale * 4,
+        chunkImage.height * scale * 4
+    
+    text.row = 25
+    text.column = 0
+    print "x=" + cursorX + ",y=" + cursorY + "    "
+ 
     isBlinking = false
     while not key.pressed("escape")
         dx = key.axis("Horizontal")
@@ -532,10 +568,7 @@ runDemo = function
         if dx != 0 or dy != 0 then
             gfx.drawImage miniMap, 0, 0, miniMap.width * scale, miniMap.height * scale
 
-            chunkX = cursorX
-            chunkY = cursorY
-
-            chunkTiles = world.generateChunk(chunkX, chunkY)
+            chunkTiles = world.generateChunk(cursorX, cursorY)
             chunkImage = generateChunkImage(chunkTiles)
 
             gfx.drawImage chunkImage,
@@ -543,7 +576,7 @@ runDemo = function
                 0,
                 chunkImage.width * scale * 4,
                 chunkImage.height * scale * 4
-                
+            
             text.row = 25
             text.column = 0
             print "x=" + cursorX + ",y=" + cursorY + "    "
