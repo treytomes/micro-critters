@@ -141,51 +141,118 @@ Chunk.applyOverworldTile = function(x, y, owTileName)
     end if
 end function
 
-Chunk.toSerializable = function
-	result = {}
-	result.worldX = self.worldX
-	result.worldY = self.worldY
-	result.worldZ = self.worldZ
+// Chunk.toSerializable = function
+// 	result = {}
+// 	result.worldX = self.worldX
+// 	result.worldY = self.worldY
+// 	result.worldZ = self.worldZ
 
-	result.width = self.width
-	result.height = self.height
+// 	result.width = self.width
+// 	result.height = self.height
 
-	result.tiles = self.tiles
-	result.metadata = self.metadata
+// 	result.tiles = self.tiles
+// 	result.metadata = self.metadata
 
-	return result
-end function
+// 	return result
+// end function
 
-Chunk.fromSerializable = function(tileSet, data)
-    self = new Chunk
+// Chunk.fromSerializable = function(tileSet, data)
+//     self = new Chunk
 
-    self.worldX = data.worldX
-    self.worldY = data.worldY
-    self.worldZ = data.worldZ
+//     self.worldX = data.worldX
+//     self.worldY = data.worldY
+//     self.worldZ = data.worldZ
     
-    self.width = data.width
-    self.height = data.height
+//     self.width = data.width
+//     self.height = data.height
 
-    self.tileSet = tileSet
+//     self.tileSet = tileSet
 
-    self.tiles = data.tiles
-    self.metadata = data.metadata
-    return self
-end function
+//     self.tiles = data.tiles
+//     self.metadata = data.metadata
+//     return self
+// end function
 
 Chunk.saveChunk = function
-	path = "/usr/chunk_{worldX}_{worldY}_{worldZ}.json".fill(self)
-	data = self.toSerializable
-	file.writeLines path, json.toJSON(data)
-	return path
+	// path = "/usr/chunk_{worldX}_{worldY}_{worldZ}.json".fill(self)
+    // data = self.toSerializable
+	// file.writeLines path, json.toJSON(data)
+
+    writer = RawFileWriter.make
+    writer.writeInt self.worldX
+    writer.writeInt self.worldY
+    writer.writeInt self.worldZ
+    writer.writeInt self.width
+    writer.writeInt self.height
+
+    for y in range(0, self.height - 1)
+        for x in range(0, self.width - 1)
+            writer.writeInt self.tiles[y][x]
+        end for
+    end for
+
+    for y in range(0, self.height - 1)
+        for x in range(0, self.width - 1)
+            writer.writeInt self.metadata[y][x]
+        end for
+    end for
+    
+    path = "/usr/chunk_{worldX}_{worldY}_{worldZ}.raw".fill(self)
+    writer.save path
+
+    return path
 end function
 
 Chunk.loadChunk = function(tileSet, worldX, worldY, worldZ)
-	path = "/usr/chunk_{0}_{1}_{2}.json".fill([ worldX, worldY, worldZ ])
+	// path = "/usr/chunk_{0}_{1}_{2}.json".fill([ worldX, worldY, worldZ ])
+    // qa.assert file.exists(path), "'" + path +"' does not exist."
+    // jsonText = file.open(path).read
+	// result = json.parse(jsonText)
+    // return self.fromSerializable(tileSet, result)
+
+	path = "/usr/chunk_{0}_{1}_{2}.raw".fill([ worldX, worldY, worldZ ])
     qa.assert file.exists(path), "'" + path +"' does not exist."
-    jsonText = file.open(path).read
-	result = json.parse(jsonText)
-    return self.fromSerializable(tileSet, result)
+    reader = RawFileReader.read(path)
+
+    self = new Chunk
+
+    // --- Basic chunk state ---
+    self.worldX = reader.readInt
+    self.worldY = reader.readInt
+    self.worldZ = reader.readInt
+    self.width = reader.readInt
+    self.height = reader.readInt
+    self.tileSet = tileSet
+
+    // --- Allocate tile + metadata grids ---
+    self.tiles = []
+    self.metadata = []
+    for y in range(0, self.height - 1)
+        tRow = []
+        mRow = []
+        for x in range(0, self.width - 1)
+            tRow.push 0
+            mRow.push {}
+        end for
+        self.tiles.push tRow
+        self.metadata.push mRow
+    end for
+
+    // Load the tiles.
+    for y in range(0, self.height - 1)
+        for x in range(0, self.width - 1)
+            self.tiles[y][x] = reader.readInt
+        end for
+    end for
+
+    // Load the metadata.
+    for y in range(0, self.height - 1)
+        for x in range(0, self.width - 1)
+            self.metadata[y][x] = reader.readInt
+        end for
+    end for
+    
+    return self
 end function
 
 Chunk.render = function(tileDisplay)
@@ -217,12 +284,7 @@ Chunk.getTile = function(tileName)
 end function
 
 Chunk.getMetadata = function(tileName)
-	data = self.getTile(tileName)
-	if data.hasIndex("metadata") then
-		// TODO: return a shallow copy of metadata
-		return data.metadata
-	end if
-	return {}
+	return 0
 end function
 
 return Chunk

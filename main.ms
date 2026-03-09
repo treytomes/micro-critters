@@ -27,6 +27,8 @@ ensureImport "Label"
 ensureImport "PerlinNoise"
 ensureImport "Point"
 ensureImport "Race"
+ensureImport "RawFileReader"
+ensureImport "RawFileWriter"
 ensureImport "Rectangle"
 ensureImport "Tile"
 ensureImport "TileSet"
@@ -78,12 +80,23 @@ loadChunk = function(worldX, worldY, worldZ)
 
 	if globals.world == null then
 		seed = 0
-		globals.world = World.make(256, 256, seed)
+		path = "/usr/world_{0}.raw".fill([ seed ])
+		if file.exists(path) then
+			print "Loading world..."
+			globals.world = World.loadWorld(path)
+			print "Done."
+		else
+			print "Generating world..."
+			globals.world = World.make(256, 256, seed)
+			print "Saving world..."
+			globals.world.saveWorld
+			print "Done."
+		end if
 	end if
 
 	chunkTiles = AssetFactory.loadTileSet("chunkTiles")
 
-	path = "/usr/chunk_{0}_{1}_{2}.json".fill([ worldX, worldY, worldZ ])
+	path = "/usr/chunk_{0}_{1}_{2}.raw".fill([ worldX, worldY, worldZ ])
 	if file.exists(path) then
 		print "Loading chunk from disk for {0},{1},{2}".fill([ worldX,worldY,worldZ ])
 		globals.chunk = Chunk.loadChunk(chunkTiles, worldX, worldY, worldZ)
