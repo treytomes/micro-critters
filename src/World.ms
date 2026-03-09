@@ -78,18 +78,29 @@ World.generateOverworld = function(w, h, seed)
     self.tiles = []
     self.elevation = []
 
-    // --------------------------------------------------
-    // Base elevation + biome classification
-    // --------------------------------------------------
-    for y in range(0, h-1)
-        for x in range(0, w-1)
-            i = x + y * w
+    self._generateBase base1, base2, rock1, rock2, rock3
+    self._generateShallows
+    self._generateRivers
+    self._generateCoasts
+    self._generateDeserts base1
+    self._generateTrees
+
+    return self.tiles
+end function
+
+// --------------------------------------------------
+// Base elevation + biome classification
+// --------------------------------------------------
+World._generateBase = function(base1, base2, rock1, rock2, rock3)
+    for y in range(0, self.height - 1)
+        for x in range(0, self.width - 1)
+            i = x + y * self.width
 
             elev = abs(base1[i] - base2[i]) * 3 - 2
 
             // Island falloff
-            xd = abs(x / (w-1) * 2 - 1)
-            yd = abs(y / (h-1) * 2 - 1)
+            xd = abs(x / (self.width - 1) * 2 - 1)
+            yd = abs(y / (self.height - 1) * 2 - 1)
             dist = mathUtil.max(xd, yd) ^ 8
             elev = elev + 1 - dist * 20
 
@@ -110,18 +121,20 @@ World.generateOverworld = function(w, h, seed)
             end if
         end for
     end for
+end function
 
-    // --------------------------------------------------
-    // Enforce shallow water along coasts
-    // --------------------------------------------------
-    for y in range(1, h-2)
-        for x in range(1, w-2)
-            i = x + y * w
+// --------------------------------------------------
+// Enforce shallow water along coasts
+// --------------------------------------------------
+World._generateShallows = function
+    for y in range(1, self.height - 2)
+        for x in range(1, self.width - 2)
+            i = x + y * self.width
             if self.tiles[i] != WATER_DEEP_INDEX then continue
 
-            for yy in range(y-1, y+1)
-                for xx in range(x-1, x+1)
-                    t = self.tiles[xx + yy*w]
+            for yy in range(y - 1, y + 1)
+                for xx in range(x - 1, x + 1)
+                    t = self.tiles[xx + yy * self.width]
                     if t == GRASS_INDEX or t == ROCK_INDEX then
                         self.tiles[i] = WATER_SHALLOW_INDEX
                     end if
@@ -129,19 +142,21 @@ World.generateOverworld = function(w, h, seed)
             end for
         end for
     end for
+end function
 
-    // --------------------------------------------------
-    // River generation (downhill with wandering)
-    // --------------------------------------------------
-    riverCount = floor(w * h / 6000)
-    maxRiverLength = (w + h) * 1
+// --------------------------------------------------
+// River generation (downhill with wandering)
+// --------------------------------------------------
+World._generateRivers = function
+    riverCount = floor(self.width * self.height / 6000)
+    maxRiverLength = (self.width + self.height) * 1
 
     for r in range(0, riverCount)
         // Pick a mountain source
         for tries in range(0, 100)
-            sx = randInt(0, w)
-            sy = randInt(0, h)
-            si = sx + sy * w
+            sx = randInt(0, self.width)
+            sy = randInt(0, self.height)
+            si = sx + sy * self.width
             if self.tiles[si] == RIVER_INDEX or (self.tiles[si] == ROCK_INDEX and self.elevation[si] > 0.8) then break
         end for
 
@@ -149,7 +164,7 @@ World.generateOverworld = function(w, h, seed)
         cy = sy
 
         for step in range(0, maxRiverLength)
-            i = cx + cy * w
+            i = cx + cy * self.width
 
             // Stop at sea
             if self.tiles[i] == WATER_SHALLOW_INDEX or self.tiles[i] == WATER_DEEP_INDEX then break
@@ -168,10 +183,10 @@ World.generateOverworld = function(w, h, seed)
 
             for yy in range(cy-1, cy+1)
                 for xx in range(cx-1, cx+1)
-                    if xx < 0 or yy < 0 or xx >= w or yy >= h then continue
+                    if xx < 0 or yy < 0 or xx >= self.width or yy >= self.height then continue
                     if xx == cx and yy == cy then continue
 
-                    ni = xx + yy * w
+                    ni = xx + yy * self.width
                     dh = self.elevation[ni] - currentH
 
                     // Prefer downhill, allow slight uphill wander
@@ -200,18 +215,20 @@ World.generateOverworld = function(w, h, seed)
             cy = choice[1]
         end for
     end for
+end function
 
-    // --------------------------------------------------
-    // Sand near water and rivers
-    // --------------------------------------------------
-    for y in range(1, h-2)
-        for x in range(1, w-2)
-            i = x + y * w
+// --------------------------------------------------
+// Sand near water and rivers
+// --------------------------------------------------
+World._generateCoasts = function
+    for y in range(1, self.height - 2)
+        for x in range(1, self.width - 2)
+            i = x + y * self.width
             if self.tiles[i] != GRASS_INDEX then continue
 
-            for yy in range(y-1, y+1)
-                for xx in range(x-1, x+1)
-                    t = self.tiles[xx + yy*w]
+            for yy in range(y - 1, y + 1)
+                for xx in range(x - 1, x + 1)
+                    t = self.tiles[xx + yy * self.width]
                     if t == WATER_SHALLOW_INDEX or t == RIVER_INDEX then
                         self.tiles[i] = SAND_INDEX
                     end if
@@ -219,63 +236,65 @@ World.generateOverworld = function(w, h, seed)
             end for
         end for
     end for
+end function
 
-    // --------------------------------------------------
-    // Desert expansion (noise-biased)
-    // --------------------------------------------------
-    for y in range(0, h-1)
-        for x in range(0, w-1)
-            i = x + y * w
+// --------------------------------------------------
+// Desert expansion (noise-biased)
+// --------------------------------------------------
+World._generateDeserts = function(base1)
+    for y in range(0, self.height - 1)
+        for x in range(0, self.width - 1)
+            i = x + y * self.width
             if self.tiles[i] != GRASS_INDEX then continue
             if base1[i] < -0.1 then
                 self.tiles[i] = SAND_INDEX
             end if
         end for
     end for
+end function
 
-    // --------------------------------------------------
-    // Trees (avoid sand and rivers)
-    // --------------------------------------------------
-    for i in range(0, w*h/400)
-        x0 = randInt(0, w)
-        y0 = randInt(0, h)
+// --------------------------------------------------
+// Trees (avoid sand and rivers)
+// --------------------------------------------------
+World._generateTrees = function
+    for i in range(0, self.width * self.height / 400)
+        x0 = randInt(0, self.width)
+        y0 = randInt(0, self.height)
 
         for j in range(0, 200)
             xx = x0 + randInt(-15, 16)
             yy = y0 + randInt(-15, 16)
-            if xx < 0 or yy < 0 or xx >= w or yy >= h then continue
+            if xx < 0 or yy < 0 or xx >= self.width or yy >= self.height then continue
 
-            idx = xx + yy * w
+            idx = xx + yy * self.width
             if self.tiles[idx] == GRASS_INDEX then
                 self.tiles[idx] = TREE_INDEX
             end if
         end for
     end for
-
-    return self.tiles
 end function
 
 World.validateOverworld = function
-    count = {}
-    for i in range(0, self.width * self.height - 1)
-        t = self.tiles[i]
-        if not count.hasIndex(t) then count[t] = 0
-        count[t] = count[t] + 1
-    end for
+    // count = {}
+    // for i in range(0, self.width * self.height - 1)
+    //     t = self.tiles[i]
+    //     if not count.hasIndex(t) then count[t] = 0
+    //     count[t] = count[t] + 1
+    // end for
 
-    if count.get(ROCK_INDEX, 0) < 100 then return false
-    if count.get(SAND_INDEX, 0) < 100 then return false
-    if count.get(GRASS_INDEX, 0) < 100 then return false
-    if count.get(TREE_INDEX, 0) < 100 then return false
+    // if count.get(ROCK_INDEX, 0) < 100 then return false
+    // if count.get(SAND_INDEX, 0) < 100 then return false
+    // if count.get(GRASS_INDEX, 0) < 100 then return false
+    // if count.get(TREE_INDEX, 0) < 100 then return false
 
     return true
 end function
 
-World.make = function(w, h, seed)
+World.make = function(width, height, seed)
     seed = floor(seed)
     self = new World
     while true
-        self.generateOverworld(w, h, seed)
+        self.generateOverworld(width, height, seed)
         if self.validateOverworld then break
         seed = seed + 1
     end while
