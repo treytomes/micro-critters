@@ -3,9 +3,7 @@
 	"tileIndex": 126,
 	"foregroundColor": "#0000FF",
 	"backgroundColor": "#000080",
-	"metadata": {
-		"name": "river",
-		"blocksMovement": false,
-		"blocksVision": false
-	}
+	"name": "river",
+	"blocksMovement": false,
+	"blocksVision": false
 }

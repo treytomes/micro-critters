@@ -3,9 +3,7 @@
 	"tileIndex": "#",
 	"foregroundColor": "#A0A0A0",
 	"backgroundColor": "#808080",
-	"metadata": {
-		"name": "wall",
-		"blocksMovement": true,
-		"blocksVision": true
-	}
+	"name": "wall",
+	"blocksMovement": true,
+	"blocksVision": true
 }

@@ -3,9 +3,7 @@
 	"tileIndex": ".",
 	"foregroundColor": "#808080",
 	"backgroundColor": "#000000",
-	"metadata": {
-		"name": "floor",
-		"blocksMovement": false,
-		"blocksVision": false
-	}
+	"name": "floor",
+	"blocksMovement": false,
+	"blocksVision": false
 }

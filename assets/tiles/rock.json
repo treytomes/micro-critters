@@ -3,9 +3,7 @@
 	"tileIndex": "#",
 	"foregroundColor": "#A0A0A0",
 	"backgroundColor": "#808080",
-	"metadata": {
-		"name": "rock",
-		"blocksMovement": true,
-		"blocksVision": true
-	}
+	"name": "rock",
+	"blocksMovement": true,
+	"blocksVision": true
 }

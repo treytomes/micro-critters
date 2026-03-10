@@ -3,9 +3,7 @@
 	"tileIndex": ".",
 	"foregroundColor": "#00A000",
 	"backgroundColor": "#008000",
-	"metadata": {
-		"name": "grass",
-		"blocksMovement": false,
-		"blocksVision": false
-	}
+	"name": "grass",
+	"blocksMovement": false,
+	"blocksVision": false
 }

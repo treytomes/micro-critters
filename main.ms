@@ -119,7 +119,7 @@ newGame = function
 
 	globals.player = Entity.make(person)
 	player.behaviors.push behaviors.playerInput
-	player.moveTo 24, 44
+	player.moveTo 38, 30
 	player.addToDisplay display(4)
 
 	applyRace(player, "human")
@@ -326,7 +326,7 @@ main = function
 		n = 0
 		while n < len(entities)
 			e = entities[n]
-			globals.worldActions += e.update(deltaTime)
+			globals.worldActions += e.update(deltaTime, globals.chunk)
 			n += 1
 		end while
 

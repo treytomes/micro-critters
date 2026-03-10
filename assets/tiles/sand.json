@@ -3,9 +3,7 @@
 	"tileIndex": ".",
 	"foregroundColor": "#808000",
 	"backgroundColor": "#FFFF00",
-	"metadata": {
-		"name": "sand",
-		"blocksMovement": false,
-		"blocksVision": false
-	}
+	"name": "sand",
+	"blocksMovement": false,
+	"blocksVision": false
 }

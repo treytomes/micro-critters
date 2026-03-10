@@ -3,9 +3,7 @@
 	"tileIndex": 150,
 	"foregroundColor": "#004000",
 	"backgroundColor": "#008000",
-	"metadata": {
-		"name": "tree",
-		"blocksMovement": true,
-		"blocksVision": true
-	}
+	"name": "tree",
+	"blocksMovement": true,
+	"blocksVision": true
 }

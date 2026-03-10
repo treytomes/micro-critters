@@ -3,9 +3,7 @@
 	"tileIndex": "#",
 	"foregroundColor": "#00F000",
 	"backgroundColor": "#008000",
-	"metadata": {
-		"name": "bush",
-		"blocksMovement": false,
-		"blocksVision": false
-	}
+	"name": "bush",
+	"blocksMovement": false,
+	"blocksVision": false
 }

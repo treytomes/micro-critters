@@ -1,6 +1,12 @@
 Chunk = {}
 
 // ======================================================
+// Tile metadata bit flags
+// ======================================================
+META_BLOCKS_MOVEMENT = 1   // bit 0 (0001)
+META_BLOCKS_VISION   = 2   // bit 1 (0010)
+
+// ======================================================
 // Chunk.make
 // Builds a chunk directly from world.generateChunk output,
 // then applies local elevation + metadata.
@@ -141,43 +147,7 @@ Chunk.applyOverworldTile = function(x, y, owTileName)
     end if
 end function
 
-// Chunk.toSerializable = function
-// 	result = {}
-// 	result.worldX = self.worldX
-// 	result.worldY = self.worldY
-// 	result.worldZ = self.worldZ
-
-// 	result.width = self.width
-// 	result.height = self.height
-
-// 	result.tiles = self.tiles
-// 	result.metadata = self.metadata
-
-// 	return result
-// end function
-
-// Chunk.fromSerializable = function(tileSet, data)
-//     self = new Chunk
-
-//     self.worldX = data.worldX
-//     self.worldY = data.worldY
-//     self.worldZ = data.worldZ
-    
-//     self.width = data.width
-//     self.height = data.height
-
-//     self.tileSet = tileSet
-
-//     self.tiles = data.tiles
-//     self.metadata = data.metadata
-//     return self
-// end function
-
 Chunk.saveChunk = function
-	// path = "/usr/chunk_{worldX}_{worldY}_{worldZ}.json".fill(self)
-    // data = self.toSerializable
-	// file.writeLines path, json.toJSON(data)
-
     writer = RawFileWriter.make
     writer.writeInt self.worldX
     writer.writeInt self.worldY
@@ -204,12 +174,6 @@ Chunk.saveChunk = function
 end function
 
 Chunk.loadChunk = function(tileSet, worldX, worldY, worldZ)
-	// path = "/usr/chunk_{0}_{1}_{2}.json".fill([ worldX, worldY, worldZ ])
-    // qa.assert file.exists(path), "'" + path +"' does not exist."
-    // jsonText = file.open(path).read
-	// result = json.parse(jsonText)
-    // return self.fromSerializable(tileSet, result)
-
 	path = "/usr/chunk_{0}_{1}_{2}.raw".fill([ worldX, worldY, worldZ ])
     qa.assert file.exists(path), "'" + path +"' does not exist."
     reader = RawFileReader.read(path)
@@ -269,22 +233,55 @@ Chunk.render = function(tileDisplay)
 end function
 
 Chunk.setTile = function(x, y, tileName)
-    // qa.assert self.tileSet.tileNames.hasIndex(tileName), "this: " + self.tileSet.tileNames
-	tile = self.tileSet.tileNames[tileName]
-	metadata = self.getMetadata(tileName)
-	self.tiles[y][x] = tile
-	self.metadata[y][x] = metadata
+    // Lookup tile index
+    tile = self.tileSet.tileNames[tileName]
+
+    // Build metadata bitfield
+    meta = self.getMetadata(tileName)
+
+    self.tiles[y][x] = tile
+    self.metadata[y][x] = meta
 end function
 
 Chunk.getTile = function(tileName)
 	for t in self.tileSet.tiles
-		if t.metadata.name == tileName then return t
+		if t.name == tileName then return t
 	end for
-	qa.assert false, "Tile '" + tileName + "' is not defined."
+	qa.assert false, "Tile '{0}' is not defined.".fill([ tileName ])
 end function
 
+// ======================================================
+// getMetadata
+// Builds metadata bitfield for a tile
+// ======================================================
 Chunk.getMetadata = function(tileName)
-	return 0
+    meta = 0
+    tile = self.getTile(tileName)
+
+    // Bit 0: blocks movement
+    if tile.blocksMovement then
+        meta = bitOr(meta, META_BLOCKS_MOVEMENT)
+    end if
+
+    // Bit 1: blocks vision
+    if tile.blocksVision then
+        meta = bitOr(meta, META_BLOCKS_VISION)
+    end if
+
+    return meta
+end function
+
+// ======================================================
+// Tile collision queries
+// ======================================================
+Chunk.blocksMovementAt = function(x, y)
+    meta = self.metadata[y][x]
+    return bitAnd(meta, META_BLOCKS_MOVEMENT) != 0
+end function
+
+Chunk.blocksVisionAt = function(x, y)
+    meta = self.metadata[y][x]
+    return bitAnd(meta, META_BLOCKS_VISION) != 0
 end function
 
 return Chunk

@@ -1,7 +1,7 @@
 Action = {}
 Action.cost = 0
 
-Action.canExecute = function(entity)
+Action.canExecute = function(entity, chunk)
 	return true
 end function
 
@@ -23,8 +23,27 @@ MoveAction.make = function(dx, dy)
 	return self
 end function
 
-MoveAction.canExecute = function(entity)
-	return entity.currentEnergy >= self.cost
+MoveAction.canExecute = function(entity, chunk)
+    // Energy check
+    if entity.currentEnergy < self.cost then
+        return false
+    end if
+
+    // Target tile
+    tx = entity.getTileX + self.dx
+    ty = entity.getTileY + self.dy
+
+    // Bounds check (important, even with chunk transitions)
+    if tx < 0 or ty < 0 or tx >= chunk.width or ty >= chunk.height then
+        return false
+    end if
+
+    // Collision check using chunk metadata bits
+    if chunk.blocksMovementAt(tx, ty) then
+        return false
+    end if
+
+    return true
 end function
 
 MoveAction.execute = function(entity)

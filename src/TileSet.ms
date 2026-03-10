@@ -21,7 +21,7 @@ TileSet.fromTiles = function(tiles)
 	self.tileNames = {}
 	for n in range(0, len(self.tiles) - 1)
 		tile = self.tiles[n]
-		name = tile.metadata.name
+		name = tile.name
 		self.tileNames[name] = n
 	end for
 

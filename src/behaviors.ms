@@ -4,7 +4,7 @@ Behavior.toSerializable = function
 	return {}
 end function
 
-Behavior.update = function(entity, deltaTime)
+Behavior.update = function(entity, deltaTime, chunk)
 	return null
 end function
 
@@ -22,7 +22,7 @@ PlayerInputBehavior.toSerializable = function
 	return result
 end function
 
-PlayerInputBehavior.update = function(entity, deltaTime)
+PlayerInputBehavior.update = function(entity, deltaTime, chunk)
 	dx = key.axis("Horizontal")
 	dy = key.axis("Vertical")
 	if dx == 0 and dy == 0 then
@@ -34,7 +34,7 @@ PlayerInputBehavior.update = function(entity, deltaTime)
 		end if
 	else
 		action = actions.move(sign(dx), sign(dy))
-		if action.canExecute(entity) then
+		if action.canExecute(entity, chunk) then
 			self.boredTimer.reset
 			return WorldAction.make(entity, action)
 		end if

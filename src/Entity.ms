@@ -99,12 +99,12 @@ Entity.getTileY = function
 end function
 
 // @returns {WorldAction[]} A list of actions to add to the world queue.
-Entity.update = function(deltaTime)
+Entity.update = function(deltaTime, chunk)
 	n = 0
 	actions = []
 	while n < len(self.behaviors)
 		b = self.behaviors[n]
-		act = b.update(self, deltaTime)
+		act = b.update(self, deltaTime, chunk)
 		if act != null then
 			actions.push act
 		end if

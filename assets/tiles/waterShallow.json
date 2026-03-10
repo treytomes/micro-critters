@@ -3,9 +3,7 @@
 	"tileIndex": 126,
 	"foregroundColor": "#00A0F0",
 	"backgroundColor": "#0080A0",
-	"metadata": {
-		"name": "waterShallow",
-		"blocksMovement": false,
-		"blocksVision": false
-	}
+	"name": "waterShallow",
+	"blocksMovement": false,
+	"blocksVision": false
 }
