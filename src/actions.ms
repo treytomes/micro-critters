@@ -35,11 +35,13 @@ MoveAction.canExecute = function(entity, chunk)
 
     // Bounds check (important, even with chunk transitions)
     if tx < 0 or ty < 0 or tx >= chunk.width or ty >= chunk.height then
-        return false
+		// There's some chance that the entity will transition into an unwalkable position.  Maybe that's okay for now?
+        return true
     end if
 
     // Collision check using chunk metadata bits
     if chunk.blocksMovementAt(tx, ty) then
+		// TODO: Some kind of event or notification if the entity bumps into a wall.
         return false
     end if
 

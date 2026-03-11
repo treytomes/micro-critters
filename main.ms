@@ -33,12 +33,14 @@ ensureImport "Rectangle"
 ensureImport "Tile"
 ensureImport "TileSet"
 ensureImport "Timer"
+ensureImport "VisibilitySystem"
 ensureImport "World"
 ensureImport "WorldAction"
 
 
 chunk = null
 world = null
+worldMiniMap = null
 
 
 // You *could* think of race and class as external mutators.  If that helps.
@@ -58,11 +60,29 @@ end function
 
 
 initialize = function
-	display(6).mode = displayMode.tile
+	display(7).mode = displayMode.tile
+	display(6).mode = displayMode.sprite
+
+	// Visibility tile layer
+	display(5).mode = displayMode.tile
+	visDisplay = display(5)
+	tileSet = AssetFactory.loadTileSet("visibility")
+	visDisplay.tileSet = tileSet.image
+	visDisplay.tileSetTileSize = [tileSet.tileWidth, tileSet.tileHeight]  // size of each tile in the image
+	visDisplay.cellSize = visDisplay.tileSetTileSize
+	visDisplay.extent = [CHUNK_WIDTH, CHUNK_HEIGHT]
+	visDisplay.clear 0
+
+	display(4).mode = displayMode.pixel
+	globals.gfx = display(4)
+
+	// Cache tiles
+	// VisibilitySystem.blackTile = visDisplay.tileSet.tileNames["black"]
+	// VisibilitySystem.dimTile = visDisplay.tileSet.tileNames["blackDim"]
 
 	text.clear
 	gfx.clear
-	display(4).clear
+	display(6).clear
 
 	globals.entities = []
 	globals.worldActions = []
@@ -92,6 +112,8 @@ loadChunk = function(worldX, worldY, worldZ)
 			globals.world.saveWorld
 			print "Done."
 		end if
+
+		globals.worldMiniMap = globals.world.generateMiniMap
 	end if
 
 	chunkTiles = AssetFactory.loadTileSet("chunkTiles")
@@ -105,7 +127,9 @@ loadChunk = function(worldX, worldY, worldZ)
 		globals.chunk = Chunk.make(chunkTiles, world, worldX, worldY, worldZ)
 	end if
 
-	chunk.render display(6)
+	display(5).clear 0
+	VisibilitySystem.reset chunk, display(5)
+	chunk.render display(7)
 	return chunk
 end function
 
@@ -120,7 +144,7 @@ newGame = function
 	globals.player = Entity.make(person)
 	player.behaviors.push behaviors.playerInput
 	player.moveTo 38, 30
-	player.addToDisplay display(4)
+	player.addToDisplay display(6)
 
 	applyRace(player, "human")
 	applyClass(player, "fighter")
@@ -138,7 +162,7 @@ loadGame = function(path)
 	n = 0
 	while n < len(data.entities)
 		e = Entity.fromSerializable(data.entities[n])
-		e.addToDisplay display(4)
+		e.addToDisplay display(6)
 		entities.push e
 		n += 1
 	end while
@@ -167,8 +191,8 @@ scrollTo = function(entity)
 	halfWidth = gfx.width / 2
 	halfHeight = gfx.height / 2
 
-	mapWidth = display(6).extent[0] * display(6).cellSize[0]
-	mapHeight = display(6).extent[1] * display(6).cellSize[1]
+	mapWidth = display(7).extent[0] * display(7).cellSize[0]
+	mapHeight = display(7).extent[1] * display(7).cellSize[1]
 
 	spriteX = entity.sprite.x + entity.sprite.image.width / 2
 	spriteY = entity.sprite.y - entity.sprite.image.height / 2
@@ -189,27 +213,29 @@ scrollTo = function(entity)
 		scrollY = spriteY - halfHeight
 	end if
 
-	display(4).scrollX = scrollX
-	display(4).scrollY = scrollY
+	display(5).scrollX = scrollX
+	display(5).scrollY = scrollY
 	display(6).scrollX = scrollX
 	display(6).scrollY = scrollY
+	display(7).scrollX = scrollX
+	display(7).scrollY = scrollY
 end function
 
 
 transitionSouth = function(entity)
 	text.clear
 	ss = Image.fromScreen
-	mapHeight = display(6).extent[1] * display(6).cellSize[1]
+	mapHeight = display(7).extent[1] * display(7).cellSize[1]
 	y = 0
 
 	// Load the new tile map data here.
 	loadChunk chunk.worldX, chunk.worldY - 4, chunk.worldZ
 
-	display(6).scrollY = mapHeight - y
+	display(7).scrollY = mapHeight - y
 
 	transitionStartTime = time
 	while y < gfx.height
-		display(6).scrollY = mapHeight - y
+		display(7).scrollY = mapHeight - y
 		gfx.fillRect 0, 0, gfx.width, y, color.clear
 		gfx.drawImage ss, 0, y
 		y = (time - transitionStartTime) / SCREEN_TRANSITION_TIME * gfx.height
@@ -218,24 +244,24 @@ transitionSouth = function(entity)
 
 	tileX = entity.getTileX
 	tileY = entity.getTileY
-	entity.moveTo tileX, display(6).extent[1] - 1
+	entity.moveTo tileX, display(7).extent[1] - 1
 end function
 
 
 transitionNorth = function(entity)
 	text.clear
 	ss = Image.fromScreen
-	mapHeight = display(6).extent[1] * display(6).cellSize[1]
+	mapHeight = display(7).extent[1] * display(7).cellSize[1]
 	height = gfx.height
 
 	// TODO: Load the new tile map data here.
 	loadChunk chunk.worldX, chunk.worldY + 4, chunk.worldZ
 
-	display(6).scrollY = -height
+	display(7).scrollY = -height
 
 	transitionStartTime = time
 	while height >= 0
-		display(6).scrollY = -height
+		display(7).scrollY = -height
 		gfx.fillRect 0, height, gfx.width, gfx.height - height, color.clear
 		gfx.drawImage ss, 0, 0, gfx.width, height, 0, ss.height - height, gfx.width, height
 		height = (1 - (time - transitionStartTime) / SCREEN_TRANSITION_TIME) * gfx.height
@@ -251,17 +277,17 @@ end function
 transitionWest = function(entity)
 	text.clear
 	ss = Image.fromScreen
-	mapWidth = display(6).extent[0] * display(6).cellSize[0]
+	mapWidth = display(7).extent[0] * display(7).cellSize[0]
 	x = 0
 
 	// TODO: Load the new tile map data here.
 	loadChunk chunk.worldX - 4, chunk.worldY, chunk.worldZ
 
-	display(6).scrollX = mapWidth - x
+	display(7).scrollX = mapWidth - x
 
 	transitionStartTime = time
 	while x < gfx.width
-		display(6).scrollX = mapWidth - x
+		display(7).scrollX = mapWidth - x
 		gfx.fillRect 0, 0, x, gfx.height, color.clear
 		gfx.drawImage ss, x, 0
 		x = (time - transitionStartTime) / SCREEN_TRANSITION_TIME * gfx.width
@@ -270,24 +296,24 @@ transitionWest = function(entity)
 
 	tileX = entity.getTileX
 	tileY = entity.getTileY
-	entity.moveTo display(6).extent[0] - 1, tileY
+	entity.moveTo display(7).extent[0] - 1, tileY
 end function
 
 
 transitionEast = function(entity)
 	text.clear
 	ss = Image.fromScreen
-	mapWidth = display(6).extent[0] * display(6).cellSize[0]
+	mapWidth = display(7).extent[0] * display(7).cellSize[0]
 	width = gfx.width
 
 	// TODO: Load the new tile map data here.
 	loadChunk chunk.worldX + 4, chunk.worldY, chunk.worldZ
 
-	display(6).scrollX = -width
+	display(7).scrollX = -width
 
 	transitionStartTime = time
 	while width >= 0
-		display(6).scrollX = -width
+		display(7).scrollX = -width
 		gfx.fillRect width, 0, gfx.width - width, gfx.height, color.clear
 		gfx.drawImage ss, 0, 0, width, gfx.height, ss.width - width, 0, width, gfx.height
 		width = (1 - (time - transitionStartTime) / SCREEN_TRANSITION_TIME) * gfx.width
@@ -300,9 +326,29 @@ transitionEast = function(entity)
 end function
 
 
-main = function
-	worldMiniMap = globals.world.generateMiniMap
+drawMiniMap = function
+	gfx.clear
+	chunkScale = 4
+	if player.sprite.x < gfx.width / 2 then
+		left = gfx.width - worldMiniMap.width + (globals.chunk.worldX - chunkScale / 2)
+		gfx.drawImage worldMiniMap, gfx.width - worldMiniMap.width, 0, worldMiniMap.width, worldMiniMap.height
+	else
+		left = (globals.chunk.worldX - chunkScale / 2)
+		gfx.drawImage worldMiniMap, 0, 0, worldMiniMap.width, worldMiniMap.height
+	end if
+	bottom = (globals.chunk.worldY - chunkScale / 2)
+	width = 2 * chunkScale
+	height = 2 * chunkScale
+	isBlinking = floor(time) % 2
+	if isBlinking then
+		gfx.drawRect left, bottom, width, height, color.red
+	else
+		gfx.drawRect left, bottom, width, height, color.yellow
+	end if
+end function
 
+
+main = function
 	// boredTimerLabel = Label.make("bored timer: {value}", 25, 0, 20)
 	// isBoredLabel = Label.make("is bored: {value}", 24, 0, 15)
 	// energyLabel = Label.make("energy: {value}", 23, 0, 15)
@@ -340,28 +386,18 @@ main = function
 		ty = player.getTileY
 		if tx < 0 then
 			transitionWest player
-		else if tx >= display(6).extent[0] then
+		else if tx >= display(7).extent[0] then
 			transitionEast player
 		else if ty < 0 then
 			transitionSouth player
-		else if ty >= display(6).extent[1] then
+		else if ty >= display(7).extent[1] then
 			transitionNorth player
 		else
 			scrollTo player
 		end if
 
-		chunkScale = 4
-		gfx.drawImage worldMiniMap, 0, 0, worldMiniMap.width, worldMiniMap.height
-        left = (globals.chunk.worldX - chunkScale / 2)
-        bottom = (globals.chunk.worldY - chunkScale / 2)
-        width = 2 * chunkScale
-        height = 2 * chunkScale
-        isBlinking = floor(time) % 2
-        if isBlinking then
-            gfx.drawRect left, bottom, width, height, color.red
-        else
-            gfx.drawRect left, bottom, width, height, color.yellow
-        end if
+		VisibilitySystem.update player, globals.chunk, display(5)
+		drawMiniMap
 
 		deltaTime = time - lastFrameTime
 		lastFrameTime = time

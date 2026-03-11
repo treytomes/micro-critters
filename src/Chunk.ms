@@ -5,6 +5,7 @@ Chunk = {}
 // ======================================================
 META_BLOCKS_MOVEMENT = 1   // bit 0 (0001)
 META_BLOCKS_VISION   = 2   // bit 1 (0010)
+META_SEEN_BEFORE     = 4   // bit 3 (0300)
 
 // ======================================================
 // Chunk.make
@@ -282,6 +283,17 @@ end function
 Chunk.blocksVisionAt = function(x, y)
     meta = self.metadata[y][x]
     return bitAnd(meta, META_BLOCKS_VISION) != 0
+end function
+
+Chunk.markSeen = function(x, y)
+    meta = self.metadata[y][x]
+    if bitAnd(meta, META_SEEN_BEFORE) == 0 then
+        self.metadata[y][x] = bitOr(meta, META_SEEN_BEFORE)
+    end if
+end function
+
+Chunk.hasBeenSeen = function(x, y)
+    return bitAnd(self.metadata[y][x], META_SEEN_BEFORE) != 0
 end function
 
 return Chunk
