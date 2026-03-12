@@ -2,7 +2,7 @@
 	"tileSet": "fontTiles",
 	"tileIndex": ".",
 	"foregroundColor": "#00A000",
-	"backgroundColor": "#008000",
+	"backgroundColor": "#000000",
 	"name": "grass",
 	"blocksMovement": false,
 	"blocksVision": false

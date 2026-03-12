@@ -1,8 +1,8 @@
 {
 	"tileSet": "fontTiles",
 	"tileIndex": "#",
-	"foregroundColor": "#A0A0A0",
-	"backgroundColor": "#808080",
+	"foregroundColor": "#000000",
+	"backgroundColor": "#A0A0A0",
 	"name": "wall",
 	"blocksMovement": true,
 	"blocksVision": true

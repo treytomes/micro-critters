@@ -2,7 +2,7 @@
 	"tileSet": "fontTiles",
 	"tileIndex": 150,
 	"foregroundColor": "#004000",
-	"backgroundColor": "#008000",
+	"backgroundColor": "#000000",
 	"name": "tree",
 	"blocksMovement": true,
 	"blocksVision": true

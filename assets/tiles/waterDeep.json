@@ -1,8 +1,8 @@
 {
 	"tileSet": "fontTiles",
 	"tileIndex": 126,
-	"foregroundColor": "#0000FF",
-	"backgroundColor": "#000080",
+	"foregroundColor": "#0040A0",
+	"backgroundColor": "#000000",
 	"name": "waterDeep",
 	"blocksMovement": false,
 	"blocksVision": false

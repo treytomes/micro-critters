@@ -2,7 +2,7 @@
 	"tileSet": "fontTiles",
 	"tileIndex": "#",
 	"foregroundColor": "#A0A0A0",
-	"backgroundColor": "#808080",
+	"backgroundColor": "#000000",
 	"name": "rock",
 	"blocksMovement": true,
 	"blocksVision": true

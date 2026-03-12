@@ -1,8 +1,8 @@
 {
 	"tileSet": "fontTiles",
 	"tileIndex": ".",
-	"foregroundColor": "#808000",
-	"backgroundColor": "#FFFF00",
+	"foregroundColor": "#A0A000",
+	"backgroundColor": "#000000",
 	"name": "sand",
 	"blocksMovement": false,
 	"blocksVision": false
